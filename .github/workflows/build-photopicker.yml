@@ -114,38 +114,106 @@ jobs:
 
 
       # ==========================================================
-      # 7. VERIFICAR O SOURCE DO PHOTOPICKER
+      # 7. APLICAR NOSSA VERSÃO PERSONALIZADA DO PHOTOPICKER
       # ==========================================================
 
-      - name: Verify PhotoPicker source
+      - name: Install custom Fluxus PhotoPicker source
+        shell: bash
         run: |
+
+          echo "===== Fluxus PhotoPicker source ====="
+
+          find plugins/photo_picker \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+          echo ""
+          echo "===== Official PhotoPicker source before replacement ====="
+
+          find godot-ios-plugins/plugins/photo_picker \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+          echo ""
+          echo "===== Removing official PhotoPicker source files ====="
+
+          rm -f \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.mm \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.cpp \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.h \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.gdip
+
+          echo ""
+          echo "===== Copying Fluxus PhotoPicker files ====="
+
+          cp \
+            plugins/photo_picker/photo_picker.h \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.h
+
+          cp \
+            plugins/photo_picker/photo_picker.mm \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.mm
+
+          cp \
+            plugins/photo_picker/photo_picker.gdip \
+            godot-ios-plugins/plugins/photo_picker/photo_picker.gdip
+
+          echo ""
+          echo "===== Installed PhotoPicker source ====="
+
+          find godot-ios-plugins/plugins/photo_picker \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+
+      # ==========================================================
+      # 8. VERIFICAR A NOSSA VERSÃO DO PHOTOPICKER
+      # ==========================================================
+
+      - name: Verify custom PhotoPicker source
+        shell: bash
+        run: |
+
           cd godot-ios-plugins
 
-          echo "===== PhotoPicker files ====="
+          echo "======================================"
+          echo "PHOTO PICKER FILES"
+          echo "======================================"
 
           find plugins/photo_picker \
-            -maxdepth 2 \
+            -maxdepth 1 \
             -type f \
             -print
 
           echo ""
-          echo "===== GDIP files ====="
+          echo "======================================"
+          echo "PHOTO PICKER GDIP"
+          echo "======================================"
 
-          find plugins/photo_picker \
-            -maxdepth 2 \
-            -type f \
-            -name "*.gdip" \
-            -print
+          cat plugins/photo_picker/photo_picker.gdip
 
           echo ""
-          echo "===== PhotoPicker source ====="
+          echo "======================================"
+          echo "PHOTO PICKER HEADER"
+          echo "======================================"
 
-          sed -n '1,220p' \
+          sed -n '1,240p' \
+            plugins/photo_picker/photo_picker.h
+
+          echo ""
+          echo "======================================"
+          echo "PHOTO PICKER IMPLEMENTATION"
+          echo "======================================"
+
+          sed -n '1,320p' \
             plugins/photo_picker/photo_picker.mm
 
 
       # ==========================================================
-      # 8. COMPILAR HEADERS DO GODOT PARA IOS
+      # 9. COMPILAR HEADERS DO GODOT PARA IOS
       # ==========================================================
 
       - name: Build Godot iOS headers
@@ -158,7 +226,7 @@ jobs:
 
 
       # ==========================================================
-      # 9. GERAR XCFRAMEWORK RELEASE
+      # 10. GERAR XCFRAMEWORK RELEASE
       # ==========================================================
 
       - name: Build PhotoPicker release xcframework
@@ -174,7 +242,7 @@ jobs:
 
 
       # ==========================================================
-      # 10. GERAR XCFRAMEWORK DEBUG
+      # 11. GERAR XCFRAMEWORK DEBUG
       # ==========================================================
 
       - name: Build PhotoPicker debug xcframework
@@ -188,7 +256,7 @@ jobs:
 
 
       # ==========================================================
-      # 11. VERIFICAR ARQUIVOS GERADOS
+      # 12. VERIFICAR ARQUIVOS GERADOS
       # ==========================================================
 
       - name: Verify generated files
@@ -210,7 +278,7 @@ jobs:
           echo "======================================"
 
           find plugins/photo_picker \
-            -maxdepth 2 \
+            -maxdepth 1 \
             -name "*.gdip" \
             -print
 
@@ -223,7 +291,7 @@ jobs:
 
 
       # ==========================================================
-      # 12. VALIDAR QUE OS ARQUIVOS ESSENCIAIS EXISTEM
+      # 13. VALIDAR BUILD
       # ==========================================================
 
       - name: Validate build
@@ -269,7 +337,7 @@ jobs:
 
 
       # ==========================================================
-      # 13. CRIAR PACOTE PARA O FLUXUS
+      # 14. CRIAR PACOTE PARA O FLUXUS
       # ==========================================================
 
       - name: Package PhotoPicker
@@ -309,6 +377,9 @@ jobs:
           Plugin:
           PhotoPicker
 
+          Implementation:
+          PHPickerViewController
+
           Godot:
           4.6.3-stable
 
@@ -320,6 +391,19 @@ jobs:
 
           Repository:
           https://github.com/godot-sdk-integrations/godot-ios-plugins
+
+          Custom Fluxus source:
+          plugins/photo_picker
+
+          Selection limits:
+          Free: 3 images
+          Premium: 12 images
+
+          Media:
+          Images only
+
+          Camera:
+          Not used
 
           Build:
           GitHub Actions
@@ -340,7 +424,7 @@ jobs:
 
 
       # ==========================================================
-      # 14. MOSTRAR PACOTE
+      # 15. MOSTRAR PACOTE
       # ==========================================================
 
       - name: Show package
@@ -363,7 +447,7 @@ jobs:
 
 
       # ==========================================================
-      # 15. CRIAR ZIP
+      # 16. CRIAR ZIP
       # ==========================================================
 
       - name: Create ZIP
@@ -375,7 +459,7 @@ jobs:
 
 
       # ==========================================================
-      # 16. PUBLICAR ARTIFACT NO GITHUB ACTIONS
+      # 17. PUBLICAR ARTIFACT NO GITHUB ACTIONS
       # ==========================================================
 
       - name: Upload PhotoPicker artifact
