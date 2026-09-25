@@ -1,0 +1,515 @@
+/*************************************************************************/
+/*  photo_picker.cpp                                                     */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
+
+#include "photo_picker.h"
+
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+#import <Photos/Photos.h>
+#import <PhotosUI/PhotosUI.h>
+
+#if VERSION_MAJOR == 4
+#if VERSION_MINOR >= 6
+#import "drivers/apple_embedded/app_delegate_service.h"
+#import "drivers/apple_embedded/godot_app_delegate.h"
+#import "drivers/apple_embedded/godot_view_controller.h"
+#elif VERSION_MINOR >= 5
+#import "drivers/apple_embedded/godot_app_delegate.h"
+#import "drivers/apple_embedded/view_controller.h"
+#else
+#import "platform/ios/app_delegate.h"
+#import "platform/ios/view_controller.h"
+#endif
+#else
+#import "platform/iphone/app_delegate.h"
+#import "platform/iphone/view_controller.h"
+#endif
+
+PhotoPicker *instance = NULL;
+
+static const NSInteger MAX_SELECTION_LIMIT = 12;
+
+@interface GodotPhotoPicker : NSObject <PHPickerViewControllerDelegate>
+@end
+
+@implementation GodotPhotoPicker
+
+- (void)presentMultiple:(NSInteger)selectionLimit {
+
+	dispatch_async(dispatch_get_main_queue(), ^{
+
+#if VERSION_MAJOR == 4 && VERSION_MINOR >= 6
+
+		/*
+		 * Godot 4.6 hosts the engine view controller inside
+		 * a SwiftUI WindowGroup. Therefore we use the
+		 * GDTAppDelegateService to obtain the current
+		 * view controller.
+		 */
+		UIViewController *root_controller =
+				[GDTAppDelegateService viewController];
+
+#else
+
+		UIViewController *root_controller =
+				[[UIApplication sharedApplication]
+						delegate].window.rootViewController;
+
+#endif
+
+		if (!root_controller) {
+			NSLog(@"PhotoPicker: root view controller not found.");
+			return;
+		}
+
+		/*
+		 * Protection at the native-plugin level.
+		 *
+		 * Fluxus currently uses:
+		 *   Free    -> 3
+		 *   Premium -> 12
+		 */
+		if (selectionLimit < 1) {
+			selectionLimit = 1;
+		}
+
+		if (selectionLimit > MAX_SELECTION_LIMIT) {
+			selectionLimit = MAX_SELECTION_LIMIT;
+		}
+
+		/*
+		 * PHPicker is the iOS Photos picker.
+		 *
+		 * It allows the user to select photos without
+		 * requiring the application to implement the
+		 * old UIImagePickerController flow.
+		 */
+		if (@available(iOS 14.0, *)) {
+
+			PHPickerConfiguration *configuration =
+					[[PHPickerConfiguration alloc]
+							initWithPhotoLibrary:[PHPhotoLibrary sharedPhotoLibrary]];
+
+			/*
+			 * Only images are presented.
+			 *
+			 * Videos, Live Photos and other media are not
+			 * requested by Fluxus.
+			 */
+			configuration.filter =
+					[PHPickerFilter imagesFilter];
+
+			/*
+			 * Maximum number of images.
+			 */
+			configuration.selectionLimit = selectionLimit;
+
+			/*
+			 * On iOS 15+, ask PHPicker to preserve the order
+			 * in which the user selected the images.
+			 *
+			 * This is useful for Fluxus because the order
+			 * of the selected images can affect the composition.
+			 */
+			if (@available(iOS 15.0, *)) {
+				configuration.selection =
+						PHPickerConfigurationSelectionOrdered;
+			}
+
+			/*
+			 * Prefer the current representation of the asset.
+			 */
+			configuration.preferredAssetRepresentationMode =
+					PHPickerConfigurationAssetRepresentationModeCurrent;
+
+			PHPickerViewController *picker =
+					[[PHPickerViewController alloc]
+							initWithConfiguration:configuration];
+
+			picker.delegate = self;
+
+			[root_controller
+					presentViewController:picker
+					animated:YES
+					completion:nil];
+
+		} else {
+
+			NSLog(@"PhotoPicker: PHPicker requires iOS 14 or later.");
+
+		}
+	});
+}
+
+
+- (void)picker:(PHPickerViewController *)picker
+		didFinishPicking:(NSArray<PHPickerResult *> *)results {
+
+	/*
+	 * The user cancelled the picker.
+	 */
+	if (results.count == 0) {
+
+		[picker dismissViewControllerAnimated:YES completion:nil];
+
+		Array images;
+
+		PhotoPicker::get_singleton()->select_images(images);
+
+		return;
+	}
+
+	/*
+	 * Keep UIImage objects in Objective-C memory while the
+	 * asynchronous NSItemProvider operations are running.
+	 *
+	 * The array is indexed according to the PHPicker result
+	 * order so that the selection order can be preserved.
+	 */
+	NSMutableArray *orderedImages =
+			[NSMutableArray arrayWithCapacity:results.count];
+
+	for (NSInteger i = 0; i < results.count; i++) {
+		[orderedImages addObject:[NSNull null]];
+	}
+
+	dispatch_group_t group = dispatch_group_create();
+
+	for (NSInteger index = 0; index < results.count; index++) {
+
+		PHPickerResult *result = results[index];
+
+		NSItemProvider *provider = result.itemProvider;
+
+		if (![provider canLoadObjectOfClass:[UIImage class]]) {
+			continue;
+		}
+
+		dispatch_group_enter(group);
+
+		[provider loadObjectOfClass:[UIImage class]
+				  completionHandler:^(UIImage *image, NSError *error) {
+
+			if (error) {
+				NSLog(@"PhotoPicker: error loading image: %@",
+						error);
+			}
+
+			/*
+			 * UIImage is retained in orderedImages.
+			 *
+			 * Mutating the NSMutableArray is performed on
+			 * the main queue.
+			 */
+			dispatch_async(dispatch_get_main_queue(), ^{
+
+				if (image) {
+					orderedImages[index] = image;
+				}
+
+				dispatch_group_leave(group);
+			});
+		}];
+	}
+
+	/*
+	 * Once all asynchronous image loads have completed,
+	 * convert the UIImages into Godot Image objects.
+	 */
+	dispatch_group_notify(
+			group,
+			dispatch_get_main_queue(),
+			^{
+
+				Array images;
+
+				for (NSInteger i = 0;
+						i < orderedImages.count;
+						i++) {
+
+					id object = orderedImages[i];
+
+					if (object == [NSNull null]) {
+						continue;
+					}
+
+					UIImage *image =
+							(UIImage *)object;
+
+					Ref<Image> godot_image =
+							[self godotImageFromUIImage:image];
+
+					if (godot_image.is_valid()) {
+						images.push_back(godot_image);
+					}
+				}
+
+				/*
+				 * Close the PHPicker UI before returning
+				 * the images to Godot.
+				 */
+				[picker
+						dismissViewControllerAnimated:YES
+						completion:^{
+							PhotoPicker::get_singleton()
+									->select_images(images);
+						}];
+			});
+}
+
+
+- (Ref<Image>)godotImageFromUIImage:(UIImage *)image {
+
+	if (!image) {
+		return Ref<Image>();
+	}
+
+	/*
+	 * UIGraphics rendering normalizes the UIImage orientation.
+	 *
+	 * This is important because photos from the iOS library
+	 * can contain EXIF orientation metadata instead of being
+	 * physically stored in the displayed orientation.
+	 */
+	UIGraphicsBeginImageContextWithOptions(
+			image.size,
+			YES,
+			image.scale);
+
+	CGContextRef context =
+			UIGraphicsGetCurrentContext();
+
+	if (!context) {
+		UIGraphicsEndImageContext();
+		return Ref<Image>();
+	}
+
+	/*
+	 * Flip the Core Graphics coordinate system so that
+	 * UIImage is rendered with the expected orientation.
+	 */
+	CGContextTranslateCTM(
+			context,
+			0,
+			image.size.height);
+
+	CGContextScaleCTM(
+			context,
+			1.0,
+			-1.0);
+
+	[image drawInRect:CGRectMake(
+			0,
+			0,
+			image.size.width,
+			image.size.height)];
+
+	CGImageRef cgImage =
+			CGBitmapContextCreateImage(context);
+
+	UIGraphicsEndImageContext();
+
+	if (!cgImage) {
+		return Ref<Image>();
+	}
+
+	size_t width =
+			CGImageGetWidth(cgImage);
+
+	size_t height =
+			CGImageGetHeight(cgImage);
+
+	CGColorSpaceRef colorSpace =
+			CGColorSpaceCreateDeviceRGB();
+
+	if (!colorSpace) {
+		CGImageRelease(cgImage);
+		return Ref<Image>();
+	}
+
+	size_t bytesPerPixel = 4;
+	size_t bytesPerRow = width * bytesPerPixel;
+	size_t bitsPerComponent = 8;
+
+	CGBitmapInfo bitmapInfo =
+			kCGImageAlphaPremultipliedLast |
+			kCGBitmapByteOrderDefault;
+
+	CFMutableDataRef data =
+			CFDataCreateMutable(
+					kCFAllocatorDefault,
+					width * height * bytesPerPixel);
+
+	if (!data) {
+		CGColorSpaceRelease(colorSpace);
+		CGImageRelease(cgImage);
+		return Ref<Image>();
+	}
+
+	CFDataSetLength(
+			data,
+			width * height * bytesPerPixel);
+
+	CGDataProviderRef provider =
+			CGDataProviderCreateWithCFData(data);
+
+	CGContextRef bitmapContext =
+			CGBitmapContextCreate(
+					CFDataGetMutableBytePtr(data),
+					width,
+					height,
+					bitsPerComponent,
+					bytesPerRow,
+					colorSpace,
+					bitmapInfo);
+
+	if (!bitmapContext) {
+		CGDataProviderRelease(provider);
+		CFRelease(data);
+		CGColorSpaceRelease(colorSpace);
+		CGImageRelease(cgImage);
+		return Ref<Image>();
+	}
+
+	CGContextDrawImage(
+			bitmapContext,
+			CGRectMake(
+					0,
+					0,
+					width,
+					height),
+			cgImage);
+
+	CGImageRef rgbaImage =
+			CGBitmapContextCreateImage(bitmapContext);
+
+	Ref<Image> result;
+
+	if (rgbaImage) {
+
+		CGDataProviderRef rgbaProvider =
+				CGImageGetDataProvider(rgbaImage);
+
+		CFDataRef rgbaData =
+				CGDataProviderCopyData(rgbaProvider);
+
+		if (rgbaData) {
+
+			CFIndex length =
+					CFDataGetLength(rgbaData);
+
+			Vector<uint8_t> img_data;
+			img_data.resize(length);
+
+			uint8_t *write_ptr =
+					img_data.ptrw();
+
+			memcpy(
+					write_ptr,
+					CFDataGetBytePtr(rgbaData),
+					length);
+
+			result.instantiate();
+
+			result->set_data(
+					width,
+					height,
+					false,
+					Image::FORMAT_RGBA8,
+					img_data);
+
+			CFRelease(rgbaData);
+		}
+
+		CGImageRelease(rgbaImage);
+	}
+
+	CGContextRelease(bitmapContext);
+	CGDataProviderRelease(provider);
+	CFRelease(data);
+	CGColorSpaceRelease(colorSpace);
+	CGImageRelease(cgImage);
+
+	return result;
+}
+
+@end
+
+
+PhotoPicker *PhotoPicker::get_singleton() {
+	return instance;
+}
+
+
+void PhotoPicker::_bind_methods() {
+
+	ClassDB::bind_method(
+			D_METHOD("present_multiple", "selection_limit"),
+			&PhotoPicker::present_multiple);
+
+	ADD_SIGNAL(
+			MethodInfo(
+					"images_picked",
+					PropertyInfo(
+							Variant::ARRAY,
+							"images")));
+}
+
+
+void PhotoPicker::present_multiple(int selection_limit) {
+
+	[godot_photo_picker
+			presentMultiple:selection_limit];
+}
+
+
+void PhotoPicker::select_images(Array images) {
+
+	emit_signal(
+			"images_picked",
+			images);
+}
+
+
+PhotoPicker::PhotoPicker() {
+
+	instance = this;
+
+	godot_photo_picker =
+			[[GodotPhotoPicker alloc] init];
+}
+
+
+PhotoPicker::~PhotoPicker() {
+
+	instance = NULL;
+
+	godot_photo_picker = nil;
+}
