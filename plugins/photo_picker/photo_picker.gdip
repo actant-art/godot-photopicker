@@ -1,0 +1,17 @@
+[config]
+name="PhotoPicker"
+binary="photo_picker.xcframework"
+
+initialization="godot_photopicker_init"
+deinitialization="godot_photopicker_deinit"
+
+[dependencies]
+linked=[]
+embedded=[]
+system=["PhotosUI"]
+
+capabilities=[]
+
+files=[]
+
+[plist]
