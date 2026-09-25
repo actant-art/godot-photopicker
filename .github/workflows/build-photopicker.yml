@@ -309,29 +309,83 @@ jobs:
       - name: Build PhotoPicker release xcframework
         run: |
           cd godot-ios-plugins
-           export IPHONEOS_DEPLOYMENT_TARGET=15.0
+
           chmod +x scripts/generate_xcframework.sh
 
-          ./scripts/generate_xcframework.sh \
-            photo_picker \
-            release \
-            4.0
+          scons \
+            target=release \
+            arch=arm64 \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+          scons \
+            target=release \
+            arch=x86_64 \
+            simulator=yes \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+          scons \
+            target=release \
+            arch=arm64 \
+            simulator=yes \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+          lipo -create \
+            "./bin/libphoto_picker.x86_64-simulator.release.a" \
+            "./bin/libphoto_picker.arm64-simulator.release.a" \
+            -output "./bin/libphoto_picker-simulator.release.a"
+
+          xcodebuild -create-xcframework \
+            -library "./bin/libphoto_picker.arm64-ios.release.a" \
+            -library "./bin/libphoto_picker-simulator.release.a" \
+            -output "./bin/photo_picker.release.xcframework"
 
 
       # ==========================================================
       # 12. GERAR XCFRAMEWORK DEBUG
       # ==========================================================
-
+  
       - name: Build PhotoPicker debug xcframework
         run: |
           cd godot-ios-plugins
-
-          export IPHONEOS_DEPLOYMENT_TARGET=15.0
-
-          ./scripts/generate_xcframework.sh \
-            photo_picker \
-            debug \
-            4.0
+  
+          scons \
+            target=debug \
+            arch=arm64 \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+  
+          scons \
+            target=debug \
+            arch=x86_64 \
+            simulator=yes \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+  
+          scons \
+            target=debug \
+            arch=arm64 \
+            simulator=yes \
+            plugin=photo_picker \
+            version=4.0 \
+            ios_deployment_target=15.0
+  
+          lipo -create \
+            "./bin/libphoto_picker.x86_64-simulator.debug.a" \
+            "./bin/libphoto_picker.arm64-simulator.debug.a" \
+            -output "./bin/libphoto_picker-simulator.debug.a"
+  
+          xcodebuild -create-xcframework \
+            -library "./bin/libphoto_picker.arm64-ios.debug.a" \
+            -library "./bin/libphoto_picker-simulator.debug.a" \
+            -output "./bin/photo_picker.debug.xcframework"
 
 
       # ==========================================================
