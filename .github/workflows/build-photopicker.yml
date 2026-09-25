@@ -13,6 +13,14 @@ jobs:
     steps:
 
       # ==========================================================
+      # 0. CHECKOUT DO REPOSITÓRIO FLUXUS PHOTOPICKER
+      # ==========================================================
+
+      - name: Checkout Fluxus PhotoPicker repository
+        uses: actions/checkout@v4
+
+
+      # ==========================================================
       # 1. VERIFICAR AMBIENTE
       # ==========================================================
 
@@ -28,6 +36,14 @@ jobs:
           echo ""
           echo "===== Xcode ====="
           xcodebuild -version
+
+          echo ""
+          echo "===== Xcode Path ====="
+          xcode-select -p
+
+          echo ""
+          echo "===== Clang ====="
+          clang --version
 
           echo ""
           echo "===== Git ====="
@@ -49,7 +65,38 @@ jobs:
 
 
       # ==========================================================
-      # 3. CLONAR GODOT IOS PLUGINS
+      # 3. VERIFICAR ARQUIVOS DO FLUXUS PHOTOPICKER
+      # ==========================================================
+
+      - name: Verify Fluxus PhotoPicker files
+        shell: bash
+        run: |
+
+          echo "===== Fluxus PhotoPicker files ====="
+
+          find plugins/photo_picker \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+          echo ""
+
+          for file in \
+            plugins/photo_picker/photo_picker.h \
+            plugins/photo_picker/photo_picker.mm \
+            plugins/photo_picker/photo_picker.gdip
+          do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Missing file: $file"
+              exit 1
+            fi
+          done
+
+          echo "All Fluxus PhotoPicker files found."
+
+
+      # ==========================================================
+      # 4. CLONAR GODOT IOS PLUGINS
       # ==========================================================
 
       - name: Clone godot-ios-plugins
@@ -65,14 +112,14 @@ jobs:
 
 
       # ==========================================================
-      # 4. USAR A CORREÇÃO DO PHOTOPICKER PARA GODOT 4.6
+      # 5. USAR A CORREÇÃO DO PHOTOPICKER PARA GODOT 4.6
       # ==========================================================
 
       - name: Checkout PhotoPicker Godot 4.6 fix
         run: |
           cd godot-ios-plugins
 
-          git fetch origin pull/105/head:photo-picker-fix
+          git fetch origin 2d94399
 
           git checkout 2d94399
 
@@ -82,7 +129,7 @@ jobs:
 
 
       # ==========================================================
-      # 5. INICIALIZAR / ATUALIZAR SUBMODULES
+      # 6. INICIALIZAR / ATUALIZAR SUBMODULES
       # ==========================================================
 
       - name: Update submodules
@@ -93,7 +140,7 @@ jobs:
 
 
       # ==========================================================
-      # 6. SELECIONAR GODOT 4.6.3
+      # 7. SELECIONAR GODOT 4.6.3
       # ==========================================================
 
       - name: Checkout Godot 4.6.3
@@ -114,7 +161,7 @@ jobs:
 
 
       # ==========================================================
-      # 7. APLICAR NOSSA VERSÃO PERSONALIZADA DO PHOTOPICKER
+      # 8. APLICAR NOSSA VERSÃO PERSONALIZADA DO PHOTOPICKER
       # ==========================================================
 
       - name: Install custom Fluxus PhotoPicker source
@@ -170,7 +217,7 @@ jobs:
 
 
       # ==========================================================
-      # 8. VERIFICAR A NOSSA VERSÃO DO PHOTOPICKER
+      # 9. VERIFICAR NOSSA VERSÃO DO PHOTOPICKER
       # ==========================================================
 
       - name: Verify custom PhotoPicker source
@@ -180,20 +227,50 @@ jobs:
           cd godot-ios-plugins
 
           echo "======================================"
-          echo "PHOTO PICKER FILES"
-          echo "======================================"
-
-          find plugins/photo_picker \
-            -maxdepth 1 \
-            -type f \
-            -print
-
-          echo ""
-          echo "======================================"
           echo "PHOTO PICKER GDIP"
           echo "======================================"
 
           cat plugins/photo_picker/photo_picker.gdip
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY PhotosUI.framework"
+          echo "======================================"
+
+          if ! grep -q \
+            'system=\["PhotosUI.framework"\]' \
+            plugins/photo_picker/photo_picker.gdip
+          then
+            echo "ERROR: PhotosUI.framework dependency not found."
+            exit 1
+          fi
+
+          echo "OK: PhotosUI.framework declared."
+
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY PHPICKER SOURCE"
+          echo "======================================"
+
+          if ! grep -q \
+            'PhotosUI/PhotosUI.h' \
+            plugins/photo_picker/photo_picker.mm
+          then
+            echo "ERROR: PhotosUI header not found."
+            exit 1
+          fi
+
+          if ! grep -q \
+            'PHPickerViewController' \
+            plugins/photo_picker/photo_picker.mm
+          then
+            echo "ERROR: PHPickerViewController not found."
+            exit 1
+          fi
+
+          echo "OK: PHPicker source detected."
+
 
           echo ""
           echo "======================================"
@@ -203,17 +280,18 @@ jobs:
           sed -n '1,240p' \
             plugins/photo_picker/photo_picker.h
 
+
           echo ""
           echo "======================================"
           echo "PHOTO PICKER IMPLEMENTATION"
           echo "======================================"
 
-          sed -n '1,320p' \
+          sed -n '1,360p' \
             plugins/photo_picker/photo_picker.mm
 
 
       # ==========================================================
-      # 9. COMPILAR HEADERS DO GODOT PARA IOS
+      # 10. COMPILAR HEADERS DO GODOT PARA IOS
       # ==========================================================
 
       - name: Build Godot iOS headers
@@ -226,7 +304,7 @@ jobs:
 
 
       # ==========================================================
-      # 10. GERAR XCFRAMEWORK RELEASE
+      # 11. GERAR XCFRAMEWORK RELEASE
       # ==========================================================
 
       - name: Build PhotoPicker release xcframework
@@ -242,7 +320,7 @@ jobs:
 
 
       # ==========================================================
-      # 11. GERAR XCFRAMEWORK DEBUG
+      # 12. GERAR XCFRAMEWORK DEBUG
       # ==========================================================
 
       - name: Build PhotoPicker debug xcframework
@@ -256,7 +334,7 @@ jobs:
 
 
       # ==========================================================
-      # 12. VERIFICAR ARQUIVOS GERADOS
+      # 13. VERIFICAR ARQUIVOS GERADOS
       # ==========================================================
 
       - name: Verify generated files
@@ -270,6 +348,16 @@ jobs:
           find bin \
             -maxdepth 1 \
             -name "photo_picker*.xcframework" \
+            -print
+
+          echo ""
+          echo "======================================"
+          echo "STATIC LIBRARIES"
+          echo "======================================"
+
+          find bin \
+            -maxdepth 1 \
+            -name "libphoto_picker*.a" \
             -print
 
           echo ""
@@ -291,7 +379,7 @@ jobs:
 
 
       # ==========================================================
-      # 13. VALIDAR BUILD
+      # 14. VALIDAR BUILD
       # ==========================================================
 
       - name: Validate build
@@ -321,6 +409,14 @@ jobs:
             exit 1
           fi
 
+          if ! grep -q \
+            'system=\["PhotosUI.framework"\]' \
+            "$GDIP"
+          then
+            echo "ERROR: .gdip does not declare PhotosUI.framework."
+            exit 1
+          fi
+
           echo "Build validation successful."
 
           echo ""
@@ -337,7 +433,7 @@ jobs:
 
 
       # ==========================================================
-      # 14. CRIAR PACOTE PARA O FLUXUS
+      # 15. CRIAR PACOTE PARA O FLUXUS
       # ==========================================================
 
       - name: Package PhotoPicker
@@ -346,19 +442,18 @@ jobs:
 
           cd godot-ios-plugins
 
+          rm -rf ../PhotoPicker-Godot-4.6.3
+
           mkdir -p ../PhotoPicker-Godot-4.6.3
 
-          # Release
           cp -R \
             bin/photo_picker.release.xcframework \
             ../PhotoPicker-Godot-4.6.3/
 
-          # Debug
           cp -R \
             bin/photo_picker.debug.xcframework \
             ../PhotoPicker-Godot-4.6.3/
 
-          # GDIP
           GDIP=$(find plugins/photo_picker \
             -maxdepth 1 \
             -name "*.gdip" \
@@ -368,7 +463,6 @@ jobs:
           cp "$GDIP" \
             ../PhotoPicker-Godot-4.6.3/
 
-          # Informações da compilação
           cat > ../PhotoPicker-Godot-4.6.3/BUILD_INFO.txt << EOF
           ==========================================
           Fluxus PhotoPicker Plugin
@@ -379,6 +473,9 @@ jobs:
 
           Implementation:
           PHPickerViewController
+
+          Framework:
+          PhotosUI.framework
 
           Godot:
           4.6.3-stable
@@ -424,7 +521,7 @@ jobs:
 
 
       # ==========================================================
-      # 15. MOSTRAR PACOTE
+      # 16. MOSTRAR PACOTE
       # ==========================================================
 
       - name: Show package
@@ -447,7 +544,7 @@ jobs:
 
 
       # ==========================================================
-      # 16. CRIAR ZIP
+      # 17. CRIAR ZIP
       # ==========================================================
 
       - name: Create ZIP
@@ -459,7 +556,7 @@ jobs:
 
 
       # ==========================================================
-      # 17. PUBLICAR ARTIFACT NO GITHUB ACTIONS
+      # 18. PUBLICAR ARTIFACT NO GITHUB ACTIONS
       # ==========================================================
 
       - name: Upload PhotoPicker artifact
