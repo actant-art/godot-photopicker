@@ -110,7 +110,6 @@ jobs:
           echo "===== Initial repository commit ====="
           git rev-parse HEAD
 
-
       # ==========================================================
       # 5. USAR A CORREÇÃO DO PHOTOPICKER PARA GODOT 4.6
       # ==========================================================
@@ -120,8 +119,6 @@ jobs:
           cd godot-ios-plugins
 
           git fetch origin pull/105/head:photo-picker-fix
-
-          git fetch origin 2d94399
 
           git checkout 2d94399
 
