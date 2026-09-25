@@ -1,0 +1,391 @@
+name: Build PhotoPicker for Godot 4.6.3
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-photopicker:
+
+    name: PhotoPicker - Godot 4.6.3
+
+    runs-on: macos-15-intel
+
+    steps:
+
+      # ==========================================================
+      # 1. VERIFICAR AMBIENTE
+      # ==========================================================
+
+      - name: Show environment
+        run: |
+          echo "===== macOS ====="
+          sw_vers
+
+          echo ""
+          echo "===== Architecture ====="
+          uname -m
+
+          echo ""
+          echo "===== Xcode ====="
+          xcodebuild -version
+
+          echo ""
+          echo "===== Git ====="
+          git --version
+
+          echo ""
+          echo "===== Python ====="
+          python3 --version
+
+
+      # ==========================================================
+      # 2. INSTALAR SCONS
+      # ==========================================================
+
+      - name: Install SCons
+        run: |
+          brew install scons
+          scons --version
+
+
+      # ==========================================================
+      # 3. CLONAR GODOT IOS PLUGINS
+      # ==========================================================
+
+      - name: Clone godot-ios-plugins
+        run: |
+          git clone --recursive \
+            https://github.com/godot-sdk-integrations/godot-ios-plugins.git
+
+          cd godot-ios-plugins
+
+          echo ""
+          echo "===== Initial repository commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 4. USAR A CORREÇÃO DO PHOTOPICKER PARA GODOT 4.6
+      # ==========================================================
+
+      - name: Checkout PhotoPicker Godot 4.6 fix
+        run: |
+          cd godot-ios-plugins
+
+          git fetch origin pull/105/head:photo-picker-fix
+
+          git checkout 2d94399
+
+          echo ""
+          echo "===== PhotoPicker commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 5. INICIALIZAR / ATUALIZAR SUBMODULES
+      # ==========================================================
+
+      - name: Update submodules
+        run: |
+          cd godot-ios-plugins
+
+          git submodule update --init --recursive
+
+
+      # ==========================================================
+      # 6. SELECIONAR GODOT 4.6.3
+      # ==========================================================
+
+      - name: Checkout Godot 4.6.3
+        run: |
+          cd godot-ios-plugins/godot
+
+          git fetch --tags
+
+          git checkout 4.6.3-stable
+
+          echo ""
+          echo "===== Godot version ====="
+          git describe --tags --always
+
+          echo ""
+          echo "===== Godot commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 7. VERIFICAR O SOURCE DO PHOTOPICKER
+      # ==========================================================
+
+      - name: Verify PhotoPicker source
+        run: |
+          cd godot-ios-plugins
+
+          echo "===== PhotoPicker files ====="
+
+          find plugins/photo_picker \
+            -maxdepth 2 \
+            -type f \
+            -print
+
+          echo ""
+          echo "===== GDIP files ====="
+
+          find plugins/photo_picker \
+            -maxdepth 2 \
+            -type f \
+            -name "*.gdip" \
+            -print
+
+          echo ""
+          echo "===== PhotoPicker source ====="
+
+          sed -n '1,220p' \
+            plugins/photo_picker/photo_picker.mm
+
+
+      # ==========================================================
+      # 8. COMPILAR HEADERS DO GODOT PARA IOS
+      # ==========================================================
+
+      - name: Build Godot iOS headers
+        run: |
+          cd godot-ios-plugins/godot
+
+          scons \
+            platform=ios \
+            target=editor
+
+
+      # ==========================================================
+      # 9. GERAR XCFRAMEWORK RELEASE
+      # ==========================================================
+
+      - name: Build PhotoPicker release xcframework
+        run: |
+          cd godot-ios-plugins
+
+          chmod +x scripts/generate_xcframework.sh
+
+          ./scripts/generate_xcframework.sh \
+            photo_picker \
+            release \
+            4.0
+
+
+      # ==========================================================
+      # 10. GERAR XCFRAMEWORK DEBUG
+      # ==========================================================
+
+      - name: Build PhotoPicker debug xcframework
+        run: |
+          cd godot-ios-plugins
+
+          ./scripts/generate_xcframework.sh \
+            photo_picker \
+            debug \
+            4.0
+
+
+      # ==========================================================
+      # 11. VERIFICAR ARQUIVOS GERADOS
+      # ==========================================================
+
+      - name: Verify generated files
+        run: |
+          cd godot-ios-plugins
+
+          echo "======================================"
+          echo "XCFRAMEWORKS"
+          echo "======================================"
+
+          find bin \
+            -maxdepth 1 \
+            -name "photo_picker*.xcframework" \
+            -print
+
+          echo ""
+          echo "======================================"
+          echo "GDIP"
+          echo "======================================"
+
+          find plugins/photo_picker \
+            -maxdepth 2 \
+            -name "*.gdip" \
+            -print
+
+          echo ""
+          echo "======================================"
+          echo "BIN DIRECTORY"
+          echo "======================================"
+
+          ls -lah bin
+
+
+      # ==========================================================
+      # 12. VALIDAR QUE OS ARQUIVOS ESSENCIAIS EXISTEM
+      # ==========================================================
+
+      - name: Validate build
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+          if [ ! -d "bin/photo_picker.release.xcframework" ]; then
+            echo "ERROR: release xcframework was not generated."
+            exit 1
+          fi
+
+          if [ ! -d "bin/photo_picker.debug.xcframework" ]; then
+            echo "ERROR: debug xcframework was not generated."
+            exit 1
+          fi
+
+          GDIP=$(find plugins/photo_picker \
+            -maxdepth 1 \
+            -name "*.gdip" \
+            -print \
+            -quit)
+
+          if [ -z "$GDIP" ]; then
+            echo "ERROR: .gdip file was not found."
+            exit 1
+          fi
+
+          echo "Build validation successful."
+
+          echo ""
+          echo "Release:"
+          du -sh bin/photo_picker.release.xcframework
+
+          echo ""
+          echo "Debug:"
+          du -sh bin/photo_picker.debug.xcframework
+
+          echo ""
+          echo "GDIP:"
+          echo "$GDIP"
+
+
+      # ==========================================================
+      # 13. CRIAR PACOTE PARA O FLUXUS
+      # ==========================================================
+
+      - name: Package PhotoPicker
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+          mkdir -p ../PhotoPicker-Godot-4.6.3
+
+          # Release
+          cp -R \
+            bin/photo_picker.release.xcframework \
+            ../PhotoPicker-Godot-4.6.3/
+
+          # Debug
+          cp -R \
+            bin/photo_picker.debug.xcframework \
+            ../PhotoPicker-Godot-4.6.3/
+
+          # GDIP
+          GDIP=$(find plugins/photo_picker \
+            -maxdepth 1 \
+            -name "*.gdip" \
+            -print \
+            -quit)
+
+          cp "$GDIP" \
+            ../PhotoPicker-Godot-4.6.3/
+
+          # Informações da compilação
+          cat > ../PhotoPicker-Godot-4.6.3/BUILD_INFO.txt << EOF
+          ==========================================
+          Fluxus PhotoPicker Plugin
+          ==========================================
+
+          Plugin:
+          PhotoPicker
+
+          Godot:
+          4.6.3-stable
+
+          PhotoPicker fix:
+          PR #105
+
+          PhotoPicker commit:
+          2d94399
+
+          Repository:
+          https://github.com/godot-sdk-integrations/godot-ios-plugins
+
+          Build:
+          GitHub Actions
+
+          Runner:
+          macos-15-intel
+
+          Architectures:
+          arm64 device
+          arm64 simulator
+          x86_64 simulator
+
+          Generated:
+          $(date -u)
+
+          ==========================================
+          EOF
+
+
+      # ==========================================================
+      # 14. MOSTRAR PACOTE
+      # ==========================================================
+
+      - name: Show package
+        run: |
+
+          echo "======================================"
+          echo "FINAL PACKAGE"
+          echo "======================================"
+
+          find PhotoPicker-Godot-4.6.3 \
+            -maxdepth 2 \
+            -print
+
+          echo ""
+          echo "======================================"
+          echo "PACKAGE SIZE"
+          echo "======================================"
+
+          du -sh PhotoPicker-Godot-4.6.3
+
+
+      # ==========================================================
+      # 15. CRIAR ZIP
+      # ==========================================================
+
+      - name: Create ZIP
+        run: |
+
+          zip -r \
+            PhotoPicker-Godot-4.6.3.zip \
+            PhotoPicker-Godot-4.6.3
+
+
+      # ==========================================================
+      # 16. PUBLICAR ARTIFACT NO GITHUB ACTIONS
+      # ==========================================================
+
+      - name: Upload PhotoPicker artifact
+        uses: actions/upload-artifact@v4
+
+        with:
+          name: PhotoPicker-Godot-4.6.3
+
+          path: PhotoPicker-Godot-4.6.3.zip
+
+          if-no-files-found: error
+
+          retention-days: 30
