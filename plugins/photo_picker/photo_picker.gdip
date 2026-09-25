@@ -8,7 +8,7 @@ deinitialization="godot_photopicker_deinit"
 [dependencies]
 linked=[]
 embedded=[]
-system=["PhotosUI"]
+system=["PhotosUI.framework"]
 
 capabilities=[]
 
