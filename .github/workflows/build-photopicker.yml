@@ -119,6 +119,8 @@ jobs:
         run: |
           cd godot-ios-plugins
 
+          git fetch origin pull/105/head:photo-picker-fix
+
           git fetch origin 2d94399
 
           git checkout 2d94399
