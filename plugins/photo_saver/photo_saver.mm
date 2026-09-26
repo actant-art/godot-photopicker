@@ -27,6 +27,7 @@ PhotoSaver *instance = NULL;
 @interface GodotPhotoSaver : NSObject
 - (void)saveImageAtPath:(NSString *)path
 			   filename:(NSString *)filename;
+- (void)saveImageFileURL:(NSURL *)fileURL;
 @end
 
 
