@@ -21,3 +21,81 @@ jobs:
         with:
           python-version: '3.13'
 
+
+      - name: Install SCons
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install scons
+
+
+      - name: Clone Godot iOS Plugins
+        run: |
+          git clone --recursive \
+            https://github.com/godot-sdk-integrations/godot-ios-plugins.git \
+            godot-ios-plugins
+
+
+      - name: Checkout PhotoPicker Godot 4.6 fix
+        run: |
+          cd godot-ios-plugins
+
+          git fetch origin pull/105/head:photo-picker-fix
+
+          git checkout 2d94399
+
+
+      - name: Update submodules
+        run: |
+          cd godot-ios-plugins
+
+          git submodule update --init --recursive
+
+
+      - name: Checkout Godot 4.6.3
+        run: |
+          cd godot-ios-plugins/godot
+
+          git fetch --tags
+
+          git checkout 4.6.3-stable
+
+
+      - name: Check iOS deployment target
+        run: |
+          cd godot-ios-plugins
+
+          grep -R "12.0" \
+            SConstruct \
+            godot/platform/ios \
+            scripts \
+            2>/dev/null || true
+
+      - name: Generate Godot iOS headers
+        run: |
+          cd godot-ios-plugins/godot
+
+          scons \
+            platform=ios \
+            target=editor
+
+
+      - name: Copy PhotoSaver plugin source
+        run: |
+          rm -rf \
+            godot-ios-plugins/plugins/photo_saver
+
+          mkdir -p \
+            godot-ios-plugins/plugins/photo_saver
+
+          cp \
+            plugins/photo_saver/photo_saver.h \
+            godot-ios-plugins/plugins/photo_saver/
+
+          cp \
+            plugins/photo_saver/photo_saver.mm \
+            godot-ios-plugins/plugins/photo_saver/
+
+          cp \
+            plugins/photo_saver/photo_saver.gdip \
+            godot-ios-plugins/plugins/photo_saver/
+
