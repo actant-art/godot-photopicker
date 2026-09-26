@@ -114,7 +114,10 @@ jobs:
           PY
 
 
-      - name: Build PhotoSaver release xcframework
+      - name: Build PhotoSaver release
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "14.0"xcframework
+      
         run: |
           cd godot-ios-plugins
 
@@ -124,7 +127,10 @@ jobs:
             4.0
 
 
-      - name: Build PhotoSaver debug xcframework
+      - name: Build PhotoSaver debug 
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "14.0"xcframeworkxcframework
+      
         run: |
           cd godot-ios-plugins
 
