@@ -57,6 +57,16 @@ jobs:
           git checkout 4.6.3-stable
 
 
+      - name: Check iOS deployment target
+        run: |
+          cd godot-ios-plugins
+
+          grep -R "12.0" \
+            SConstruct \
+            godot/platform/ios \
+            scripts \
+            2>/dev/null || true
+
       - name: Generate Godot iOS headers
         run: |
           cd godot-ios-plugins/godot
