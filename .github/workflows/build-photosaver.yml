@@ -1,4 +1,4 @@
-```yaml
+yaml
 name: Build PhotoSaver for Godot 4.6.3
 
 on:
