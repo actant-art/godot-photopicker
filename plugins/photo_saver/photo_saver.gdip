@@ -1,0 +1,21 @@
+[config]
+
+name="PhotoSaver"
+binary="photo_saver.xcframework"
+
+initialization="godot_photosaver_init"
+deinitialization="godot_photosaver_deinit"
+
+
+[dependencies]
+
+linked=[]
+embedded=[]
+system=["Photos.framework"]
+capabilities=[]
+files=[]
+
+
+[plist]
+
+NSPhotoLibraryAddUsageDescription:string_input="Fluxus precisa de acesso para salvar as imagens criadas no Fotos."
