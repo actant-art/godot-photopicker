@@ -87,32 +87,32 @@ jobs:
           cp \
             plugins/photo_saver/photo_saver.gdip \
             godot-ios-plugins/plugins/photo_saver/
-      
-      - name: Register PhotoSaver plugin
-        run: |
-          cd godot-ios-plugins
-      
-          python - <<'PY'
-          from pathlib import Path
-      
-          path = Path("SConstruct")
-          text = path.read_text()
-      
-          old = '        "photo_picker",\n'
-          new = '        "photo_picker",\n        "photo_saver",\n'
-      
-          if '"photo_saver",' not in text:
-              if old not in text:
-                  raise SystemExit(
-                      "Não foi encontrada a entrada photo_picker no SConstruct."
-                  )
-      
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-              print("PhotoSaver registrado no SConstruct.")
-          else:
-              print("PhotoSaver já está registrado.")
-          PY
+
+              - name: Register PhotoSaver plugin
+              run: |
+                cd godot-ios-plugins
+
+                python - <<'PY'
+                from pathlib import Path
+
+                path = Path("SConstruct")
+                text = path.read_text()
+
+                old = "'photo_picker'"
+                new = "'photo_picker', 'photo_saver'"
+
+                if "'photo_saver'" not in text:
+                    if old not in text:
+                        raise SystemExit(
+                            "Não foi encontrada a entrada photo_picker no SConstruct."
+                        )
+
+                    text = text.replace(old, new, 1)
+                    path.write_text(text)
+                    print("PhotoSaver registrado no SConstruct.")
+                else:
+                    print("PhotoSaver já está registrado.")
+                PY    
 
       - name: Build PhotoSaver release xcframework
         run: |
