@@ -96,12 +96,15 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 		 *   Free    -> 3
 		 *   Premium -> 12
 		 */
-		if (selectionLimit < 1) {
-			selectionLimit = 1;
+		
+		NSInteger limit = selectionLimit;
+		
+		if (limit < 1) {
+			limit = 1;
 		}
-
-		if (selectionLimit > MAX_SELECTION_LIMIT) {
-			selectionLimit = MAX_SELECTION_LIMIT;
+		
+		if (limit > MAX_SELECTION_LIMIT) {
+			limit = MAX_SELECTION_LIMIT;
 		}
 
 		/*
@@ -129,7 +132,7 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 			/*
 			 * Maximum number of images.
 			 */
-			configuration.selectionLimit = selectionLimit;
+			configuration.selectionLimit = limit;
 
 			/*
 			 * On iOS 15+, ask PHPicker to preserve the order
