@@ -5,7 +5,10 @@
 #ifndef PHOTO_SAVER_H
 #define PHOTO_SAVER_H
 
-#include "core/version.h"
+#include "photo_saver.h"
+#include "core/config/engine.h"
+
+#import <Photos/Photos.h>
 
 #if VERSION_MAJOR == 4
 #include "core/io/image.h"
