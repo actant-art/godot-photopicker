@@ -1,3 +1,4 @@
+```yaml
 name: Build PhotoSaver for Godot 4.6.3
 
 on:
@@ -30,8 +31,6 @@ jobs:
           git clone --recursive \
             https://github.com/godot-sdk-integrations/godot-ios-plugins.git \
             godot-ios-plugins
-
-          cd godot-ios-plugins
 
 
       - name: Checkout PhotoPicker Godot 4.6 fix
@@ -88,31 +87,33 @@ jobs:
             plugins/photo_saver/photo_saver.gdip \
             godot-ios-plugins/plugins/photo_saver/
 
-              - name: Register PhotoSaver plugin
-              run: |
-                cd godot-ios-plugins
 
-                python - <<'PY'
-                from pathlib import Path
+      - name: Register PhotoSaver plugin
+        run: |
+          cd godot-ios-plugins
 
-                path = Path("SConstruct")
-                text = path.read_text()
+          python - <<'PY'
+          from pathlib import Path
 
-                old = "'photo_picker'"
-                new = "'photo_picker', 'photo_saver'"
+          path = Path("SConstruct")
+          text = path.read_text()
 
-                if "'photo_saver'" not in text:
-                    if old not in text:
-                        raise SystemExit(
-                            "Não foi encontrada a entrada photo_picker no SConstruct."
-                        )
+          old = "'photo_picker'"
+          new = "'photo_picker', 'photo_saver'"
 
-                    text = text.replace(old, new, 1)
-                    path.write_text(text)
-                    print("PhotoSaver registrado no SConstruct.")
-                else:
-                    print("PhotoSaver já está registrado.")
-                PY    
+          if "'photo_saver'" not in text:
+              if old not in text:
+                  raise SystemExit(
+                      "Não foi encontrada a entrada photo_picker no SConstruct."
+                  )
+
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+              print("PhotoSaver registrado no SConstruct.")
+          else:
+              print("PhotoSaver já está registrado.")
+          PY
+
 
       - name: Build PhotoSaver release xcframework
         run: |
