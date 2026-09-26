@@ -170,43 +170,6 @@ jobs:
             PhotoSaver-Godot-4.6.3/
 
 
-      - name: Create BUILD_INFO.txt
-        run: |
-          cat > PhotoSaver-Godot-4.6.3/BUILD_INFO.txt <<'EOF'
-          PhotoSaver Godot iOS Plugin
-
-          Godot:
-          4.6.3-stable
-
-          Plugin:
-          PhotoSaver
-
-          Function:
-          Save PNG images directly into the iOS Photos library.
-
-          Apple API:
-          PhotoKit
-          PHPhotoLibrary
-          PHAssetChangeRequest
-
-          Permission:
-          NSPhotoLibraryAddUsageDescription
-
-          Camera:
-          Not used
-
-          Output:
-          photo_saver.release.xcframework
-          photo_saver.debug.xcframework
-          photo_saver.gdip
-
-          Godot 4.6 compatibility:
-          Yes
-
-          Source:
-          Custom Fluxus plugin
-          EOF
-
 
       - name: Upload PhotoSaver artifact
         uses: actions/upload-artifact@v4
