@@ -23,6 +23,7 @@ class PhotoSaver : public Object {
 
 public:
 	void save_image(String path, String filename);
+	void save_video(String path, String filename);
 
 	PhotoSaver();
 	~PhotoSaver();
