@@ -5,20 +5,8 @@
 #ifndef PHOTO_SAVER_H
 #define PHOTO_SAVER_H
 
-#include "photo_saver.h"
-#include "core/config/engine.h"
-
-#import <Photos/Photos.h>
-
-#if VERSION_MAJOR == 4
-#include "core/io/image.h"
 #include "core/object/object.h"
-#include "core/variant/array.h"
-#else
-#include "core/image.h"
-#include "core/object.h"
-#include "core/variant/array.h"
-#endif
+#include "core/string/ustring.h"
 
 #ifdef __OBJC__
 @class GodotPhotoSaver;
