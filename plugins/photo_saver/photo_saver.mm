@@ -74,79 +74,64 @@ PhotoSaver *instance = nullptr;
 			/*****************************************************************/
 			/* Request Photos permission                                     */
 			/*****************************************************************/
-
-			if (@available(iOS 14.0, *)) {
-
-				PHAuthorizationStatus status =
-					[PHPhotoLibrary
-						authorizationStatusForAccessLevel:
-							PHAccessLevelAddOnly];
-
-
-				/*****************************************************************/
-				/* Access denied                                                  */
-				/*****************************************************************/
-
-				if (status == PHAuthorizationStatusDenied ||
-					status == PHAuthorizationStatusRestricted) {
-
-					NSLog(
-						@"PhotoSaver: photo library access denied."
-					);
-
-					PhotoSaver::get_singleton()->emit_signal(
-						"image_saved",
-						false,
-						"Permissão para salvar no Fotos foi negada."
-					);
-
-					return;
-				}
-
-
-				/*****************************************************************/
-				/* Permission not determined                                     */
-				/*****************************************************************/
-
-				if (status == PHAuthorizationStatusNotDetermined) {
-
-					[[PHPhotoLibrary sharedPhotoLibrary]
-						requestAuthorizationForAccessLevel:
-							PHAccessLevelAddOnly
-						handler:
-							^(PHAuthorizationStatus newStatus) {
-
-								dispatch_async(
-									dispatch_get_main_queue(),
-									^{
-
-										if (
-											newStatus ==
-												PHAuthorizationStatusAuthorized ||
-											newStatus ==
-												PHAuthorizationStatusLimited
-										) {
-
-											[self
-												saveImageFileURL:
-													fileURL];
-										}
-										else {
-
-											PhotoSaver::get_singleton()
-												->emit_signal(
-													"image_saved",
-													false,
-													"Permissão para salvar no Fotos foi negada."
-												);
-										}
+			PHAuthorizationStatus status =
+				[PHPhotoLibrary authorizationStatus];
+			
+			
+			if (status == PHAuthorizationStatusDenied ||
+				status == PHAuthorizationStatusRestricted) {
+			
+				NSLog(
+					@"PhotoSaver: photo library access denied."
+				);
+			
+				PhotoSaver::get_singleton()->emit_signal(
+					"image_saved",
+					false,
+					"Permissão para salvar no Fotos foi negada."
+				);
+			
+				return;
+			}
+			
+			
+			if (status == PHAuthorizationStatusNotDetermined) {
+			
+				[PHPhotoLibrary
+					requestAuthorization:
+						^(PHAuthorizationStatus newStatus) {
+			
+							dispatch_async(
+								dispatch_get_main_queue(),
+								^{
+			
+									if (
+										newStatus ==
+											PHAuthorizationStatusAuthorized ||
+										newStatus ==
+											PHAuthorizationStatusLimited
+									) {
+			
+										[self
+											saveImageFileURL:
+												fileURL];
+			
 									}
-								);
-							}
-					];
-
-					return;
-				}
+									else {
+			
+										PhotoSaver::get_singleton()
+											->emit_signal(
+												"image_saved",
+												false,
+												"Permissão para salvar no Fotos foi negada."
+											);
+									}
+								}
+							);
+						}
+				];
+			
+				return;
 			}
 
 
