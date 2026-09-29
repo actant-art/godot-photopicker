@@ -1,35 +1,26 @@
 /*************************************************************************/
-/*  photo_saver.mm                                                       */
+/*  photo_saver.mm                                                      */
 /*************************************************************************/
 
 #include "photo_saver.h"
 
-#include "core/config/engine.h"
 #include "core/object/class_db.h"
-#include "core/string/ustring.h"
 
 #import <Foundation/Foundation.h>
 #import <Photos/Photos.h>
 
 
-PhotoSaver *instance = nullptr;
+PhotoSaver *instance = NULL;
 
 
 /*************************************************************************/
-/*  Native Photo Saver                                                   */
+/*  Native Photo Saver                                                  */
 /*************************************************************************/
 
 @interface GodotPhotoSaver : NSObject
 
-- (void)saveImageAtPath:(NSString *)path
-               filename:(NSString *)filename;
-
-- (void)saveImageFileURL:(NSURL *)fileURL;
-
-- (void)saveVideoAtPath:(NSString *)path
-               filename:(NSString *)filename;
-
-- (void)saveVideoFileURL:(NSURL *)fileURL;
+- (void)saveMediaAtPath:(NSString *)path
+			   filename:(NSString *)filename;
 
 @end
 
@@ -38,595 +29,263 @@ PhotoSaver *instance = nullptr;
 
 
 /*************************************************************************/
-/*  Save image at path                                                   */
+/*  Save Image or Video to Photos                                       */
 /*************************************************************************/
 
-- (void)saveImageAtPath:(NSString *)path
-               filename:(NSString *)filename {
+- (void)saveMediaAtPath:(NSString *)path
+			   filename:(NSString *)filename {
 
-    (void)filename;
+	if (!path || path.length == 0) {
+		NSLog(@"[PhotoSaver] ERROR: Empty file path.");
+		return;
+	}
 
-    dispatch_async(
-        dispatch_get_main_queue(),
-        ^{
+	NSFileManager *file_manager = [NSFileManager defaultManager];
 
-            /*****************************************************************/
-            /* Check file                                                     */
-            /*****************************************************************/
+	if (![file_manager fileExistsAtPath:path]) {
+		NSLog(@"[PhotoSaver] ERROR: File does not exist: %@", path);
+		return;
+	}
 
-            if (![[NSFileManager defaultManager]
-                    fileExistsAtPath:path]) {
+	NSURL *file_url = [NSURL fileURLWithPath:path];
 
-                NSLog(
-                    @"PhotoSaver: image file does not exist: %@",
-                    path
-                );
+	if (!file_url) {
+		NSLog(@"[PhotoSaver] ERROR: Could not create file URL.");
+		return;
+	}
 
-                PhotoSaver::get_singleton()->emit_signal(
-                    "image_saved",
-                    false,
-                    "Arquivo temporário não encontrado."
-                );
 
-                return;
-            }
+	/*********************************************************************/
+	/*  Detect media type                                                */
+	/*********************************************************************/
 
+	NSString *extension =
+			[[path pathExtension] lowercaseString];
 
-            NSURL *fileURL =
-                [NSURL fileURLWithPath:path];
+	BOOL is_image =
+			[extension isEqualToString:@"png"] ||
+			[extension isEqualToString:@"jpg"] ||
+			[extension isEqualToString:@"jpeg"] ||
+			[extension isEqualToString:@"heic"] ||
+			[extension isEqualToString:@"heif"];
 
+	BOOL is_video =
+			[extension isEqualToString:@"mp4"] ||
+			[extension isEqualToString:@"mov"] ||
+			[extension isEqualToString:@"m4v"];
 
-            /*****************************************************************/
-            /* Request Photos permission                                     */
-            /*****************************************************************/
 
-            PHAuthorizationStatus status =
-                [PHPhotoLibrary authorizationStatus];
+	if (!is_image && !is_video) {
 
+		NSLog(
+			@"[PhotoSaver] ERROR: Unsupported media type: %@",
+			extension
+		);
 
-            if (status == PHAuthorizationStatusDenied ||
-                status == PHAuthorizationStatusRestricted) {
+		return;
+	}
 
-                NSLog(
-                    @"PhotoSaver: photo library access denied."
-                );
 
-                PhotoSaver::get_singleton()->emit_signal(
-                    "image_saved",
-                    false,
-                    "Permissão para salvar no Fotos foi negada."
-                );
+	/*********************************************************************/
+	/*  Photo Library authorization                                      */
+	/*********************************************************************/
 
-                return;
-            }
+	if (@available(iOS 14.0, *)) {
 
+		PHPhotoLibrary *photo_library =
+				[PHPhotoLibrary sharedPhotoLibrary];
 
-            if (status == PHAuthorizationStatusNotDetermined) {
+		PHAuthorizationStatus status =
+				[photo_library authorizationStatusForAccessLevel:
+						PHAccessLevelAddOnly];
 
-                [PHPhotoLibrary
-                    requestAuthorization:
-                        ^(PHAuthorizationStatus newStatus) {
 
-                            dispatch_async(
-                                dispatch_get_main_queue(),
-                                ^{
+		if (status == PHAuthorizationStatusNotDetermined) {
 
-                                    if (
-                                        newStatus ==
-                                            PHAuthorizationStatusAuthorized ||
-                                        newStatus ==
-                                            PHAuthorizationStatusLimited
-                                    ) {
+			NSLog(
+				@"[PhotoSaver] Requesting Add Only authorization."
+			);
 
-                                        [self
-                                            saveImageFileURL:
-                                                fileURL];
+			[photo_library
+				requestAuthorizationForAccessLevel:
+					PHAccessLevelAddOnly
+				handler:^(PHAuthorizationStatus new_status) {
 
-                                    }
-                                    else {
+					if (new_status == PHAuthorizationStatusAuthorized ||
+						new_status == PHAuthorizationStatusLimited) {
 
-                                        PhotoSaver::get_singleton()
-                                            ->emit_signal(
-                                                "image_saved",
-                                                false,
-                                                "Permissão para salvar no Fotos foi negada."
-                                            );
-                                    }
-                                }
-                            );
-                        }
-                ];
+						dispatch_async(
+							dispatch_get_main_queue(),
+							^{
+								[self saveMediaAtPath:path
+											 filename:filename];
+							}
+						);
 
-                return;
-            }
+					} else {
 
+						NSLog(
+							@"[PhotoSaver] Photo Library authorization denied."
+						);
+					}
+				}
+			];
 
-            /*****************************************************************/
-            /* Already authorized                                             */
-            /*****************************************************************/
+			return;
+		}
 
-            [self saveImageFileURL:fileURL];
-        }
-    );
-}
 
+		if (status != PHAuthorizationStatusAuthorized &&
+			status != PHAuthorizationStatusLimited) {
 
-/*************************************************************************/
-/*  Save image file into Photos                                          */
-/*************************************************************************/
+			NSLog(
+				@"[PhotoSaver] ERROR: Photo Library access not authorized."
+			);
 
-- (void)saveImageFileURL:(NSURL *)fileURL {
+			return;
+		}
+	}
 
-    if (!fileURL) {
 
-        PhotoSaver::get_singleton()->emit_signal(
-            "image_saved",
-            false,
-            "URL da imagem inválida."
-        );
+	/*********************************************************************/
+	/*  Save media                                                       */
+	/*********************************************************************/
 
-        return;
-    }
+	NSLog(
+		@"[PhotoSaver] Saving %@: %@",
+		is_image ? @"image" : @"video",
+		filename
+	);
 
 
-    [[PHPhotoLibrary sharedPhotoLibrary]
-        performChanges:
-            ^{
+	PHPhotoLibrary *photo_library =
+			[PHPhotoLibrary sharedPhotoLibrary];
 
-                [PHAssetChangeRequest
-                    creationRequestForAssetFromImageAtFileURL:
-                        fileURL];
 
-            }
-        completionHandler:
-            ^(BOOL success, NSError *error) {
+	[photo_library
+		performChanges:^{
 
-                dispatch_async(
-                    dispatch_get_main_queue(),
-                    ^{
+			if (is_image) {
 
-                        if (success) {
+				/*****************************************************************/
+				/*  Image                                                         */
+				/*****************************************************************/
 
-                            NSLog(
-                                @"PhotoSaver: image saved successfully."
-                            );
+				[PHAssetChangeRequest
+					creationRequestForAssetFromImageAtFileURL:file_url];
 
-                            PhotoSaver::get_singleton()
-                                ->emit_signal(
-                                    "image_saved",
-                                    true,
-                                    ""
-                                );
+			} else {
 
-                        }
-                        else {
+				/*****************************************************************/
+				/*  Video                                                         */
+				/*****************************************************************/
 
-                            NSString *message;
+				[PHAssetChangeRequest
+					creationRequestForAssetFromVideoAtFileURL:file_url];
+			}
 
-                            if (error) {
+		}
+		completionHandler:^(BOOL success, NSError *error) {
 
-                                message =
-                                    [error localizedDescription];
+			if (success) {
 
-                            }
-                            else {
+				NSLog(
+					@"[PhotoSaver] Successfully saved %@: %@",
+					is_image ? @"image" : @"video",
+					filename
+				);
 
-                                message =
-                                    @"Não foi possível salvar a imagem no Fotos.";
+			} else {
 
-                            }
-
-
-                            NSLog(
-                                @"PhotoSaver: image error: %@",
-                                message
-                            );
-
-
-                            PhotoSaver::get_singleton()
-                                ->emit_signal(
-                                    "image_saved",
-                                    false,
-                                    String(
-                                        [message UTF8String]
-                                    )
-                                );
-                        }
-                    }
-                );
-            }
-    ];
-}
-
-
-/*************************************************************************/
-/*  Save video at path                                                   */
-/*************************************************************************/
-
-- (void)saveVideoAtPath:(NSString *)path
-               filename:(NSString *)filename {
-
-    (void)filename;
-
-    dispatch_async(
-        dispatch_get_main_queue(),
-        ^{
-
-            /*****************************************************************/
-            /* Check file                                                     */
-            /*****************************************************************/
-
-            if (![[NSFileManager defaultManager]
-                    fileExistsAtPath:path]) {
-
-                NSLog(
-                    @"PhotoSaver: video file does not exist: %@",
-                    path
-                );
-
-                PhotoSaver::get_singleton()->emit_signal(
-                    "video_saved",
-                    false,
-                    "Arquivo temporário do vídeo não encontrado."
-                );
-
-                return;
-            }
-
-
-            NSURL *fileURL =
-                [NSURL fileURLWithPath:path];
-
-
-            /*****************************************************************/
-            /* Request Photos permission                                     */
-            /*****************************************************************/
-
-            PHAuthorizationStatus status =
-                [PHPhotoLibrary authorizationStatus];
-
-
-            if (status == PHAuthorizationStatusDenied ||
-                status == PHAuthorizationStatusRestricted) {
-
-                NSLog(
-                    @"PhotoSaver: photo library access denied for video."
-                );
-
-                PhotoSaver::get_singleton()->emit_signal(
-                    "video_saved",
-                    false,
-                    "Permissão para salvar no Fotos foi negada."
-                );
-
-                return;
-            }
-
-
-            if (status == PHAuthorizationStatusNotDetermined) {
-
-                [PHPhotoLibrary
-                    requestAuthorization:
-                        ^(PHAuthorizationStatus newStatus) {
-
-                            dispatch_async(
-                                dispatch_get_main_queue(),
-                                ^{
-
-                                    if (
-                                        newStatus ==
-                                            PHAuthorizationStatusAuthorized ||
-                                        newStatus ==
-                                            PHAuthorizationStatusLimited
-                                    ) {
-
-                                        [self
-                                            saveVideoFileURL:
-                                                fileURL];
-
-                                    }
-                                    else {
-
-                                        PhotoSaver::get_singleton()
-                                            ->emit_signal(
-                                                "video_saved",
-                                                false,
-                                                "Permissão para salvar no Fotos foi negada."
-                                            );
-                                    }
-                                }
-                            );
-                        }
-                ];
-
-                return;
-            }
-
-
-            /*****************************************************************/
-            /* Already authorized                                             */
-            /*****************************************************************/
-
-            [self saveVideoFileURL:fileURL];
-        }
-    );
-}
-
-
-/*************************************************************************/
-/*  Save video file into Photos                                          */
-/*************************************************************************/
-
-- (void)saveVideoFileURL:(NSURL *)fileURL {
-
-    if (!fileURL) {
-
-        PhotoSaver::get_singleton()->emit_signal(
-            "video_saved",
-            false,
-            "URL do vídeo inválida."
-        );
-
-        return;
-    }
-
-
-    [[PHPhotoLibrary sharedPhotoLibrary]
-        performChanges:
-            ^{
-
-                [PHAssetChangeRequest
-                    creationRequestForAssetFromVideoAtFileURL:
-                        fileURL];
-
-            }
-        completionHandler:
-            ^(BOOL success, NSError *error) {
-
-                dispatch_async(
-                    dispatch_get_main_queue(),
-                    ^{
-
-                        if (success) {
-
-                            NSLog(
-                                @"PhotoSaver: video saved successfully."
-                            );
-
-                            PhotoSaver::get_singleton()
-                                ->emit_signal(
-                                    "video_saved",
-                                    true,
-                                    ""
-                                );
-
-                        }
-                        else {
-
-                            NSString *message;
-
-                            if (error) {
-
-                                message =
-                                    [error localizedDescription];
-
-                            }
-                            else {
-
-                                message =
-                                    @"Não foi possível salvar o vídeo no Fotos.";
-
-                            }
-
-
-                            NSLog(
-                                @"PhotoSaver: video error: %@",
-                                message
-                            );
-
-
-                            PhotoSaver::get_singleton()
-                                ->emit_signal(
-                                    "video_saved",
-                                    false,
-                                    String(
-                                        [message UTF8String]
-                                    )
-                                );
-                        }
-                    }
-                );
-            }
-    ];
+				NSLog(
+					@"[PhotoSaver] ERROR saving %@: %@",
+					is_image ? @"image" : @"video",
+					error
+				);
+			}
+		}
+	];
 }
 
 @end
 
 
 /*************************************************************************/
-/*  Godot C API                                                          */
+/*  Godot PhotoSaver                                                    */
 /*************************************************************************/
 
-extern "C" void godot_photosaver_init();
-extern "C" void godot_photosaver_deinit();
+PhotoSaver *PhotoSaver::get_singleton() {
+	return instance;
+}
 
 
 /*************************************************************************/
-/*  Godot bindings                                                       */
+/*  Godot bindings                                                      */
 /*************************************************************************/
 
 void PhotoSaver::_bind_methods() {
 
-    /*********************************************************************/
-    /* Save image                                                        */
-    /*********************************************************************/
-
-    ClassDB::bind_method(
-        D_METHOD(
-            "save_image",
-            "path",
-            "filename"
-        ),
-        &PhotoSaver::save_image
-    );
-
-
-    /*********************************************************************/
-    /* Save video                                                        */
-    /*********************************************************************/
-
-    ClassDB::bind_method(
-        D_METHOD(
-            "save_video",
-            "path",
-            "filename"
-        ),
-        &PhotoSaver::save_video
-    );
-
-
-    /*********************************************************************/
-    /* Image saved signal                                                */
-    /*********************************************************************/
-
-    ADD_SIGNAL(
-        MethodInfo(
-            "image_saved",
-            PropertyInfo(
-                Variant::BOOL,
-                "success"
-            ),
-            PropertyInfo(
-                Variant::STRING,
-                "message"
-            )
-        )
-    );
-
-
-    /*********************************************************************/
-    /* Video saved signal                                                */
-    /*********************************************************************/
-
-    ADD_SIGNAL(
-        MethodInfo(
-            "video_saved",
-            PropertyInfo(
-                Variant::BOOL,
-                "success"
-            ),
-            PropertyInfo(
-                Variant::STRING,
-                "message"
-            )
-        )
-    );
+	ClassDB::bind_method(
+		D_METHOD("save_image", "path", "filename"),
+		&PhotoSaver::save_image
+	);
 }
 
 
 /*************************************************************************/
-/*  Public API                                                          */
+/*  Save media                                                          */
 /*************************************************************************/
 
 void PhotoSaver::save_image(
-    String path,
-    String filename) {
+		const String &path,
+		const String &filename) {
 
-    NSString *ns_path =
-        [NSString
-            stringWithUTF8String:
-                path.utf8().get_data()];
+	NSString *ns_path =
+			[NSString stringWithUTF8String:
+				path.utf8().get_data()];
 
-
-    NSString *ns_filename =
-        [NSString
-            stringWithUTF8String:
-                filename.utf8().get_data()];
+	NSString *ns_filename =
+			[NSString stringWithUTF8String:
+				filename.utf8().get_data()];
 
 
-    [godot_photo_saver
-        saveImageAtPath:
-            ns_path
-        filename:
-            ns_filename];
-}
+	if (!ns_path) {
+		NSLog(@"[PhotoSaver] ERROR: Invalid path.");
+		return;
+	}
 
 
-void PhotoSaver::save_video(
-    String path,
-    String filename) {
-
-    NSString *ns_path =
-        [NSString
-            stringWithUTF8String:
-                path.utf8().get_data()];
+	if (!ns_filename || ns_filename.length == 0) {
+		ns_filename = @"Fluxus";
+	}
 
 
-    NSString *ns_filename =
-        [NSString
-            stringWithUTF8String:
-                filename.utf8().get_data()];
-
-
-    [godot_photo_saver
-        saveVideoAtPath:
-            ns_path
-        filename:
-            ns_filename];
+	[godot_photo_saver
+		saveMediaAtPath:ns_path
+		filename:ns_filename];
 }
 
 
 /*************************************************************************/
-/*  Singleton                                                            */
+/*  Constructor                                                         */
 /*************************************************************************/
-
-PhotoSaver *PhotoSaver::get_singleton() {
-
-    return instance;
-}
-
 
 PhotoSaver::PhotoSaver() {
 
-    instance = this;
+	instance = this;
 
-    godot_photo_saver =
-        [[GodotPhotoSaver alloc] init];
+	godot_photo_saver =
+			[[GodotPhotoSaver alloc] init];
 }
 
+
+/*************************************************************************/
+/*  Destructor                                                          */
+/*************************************************************************/
 
 PhotoSaver::~PhotoSaver() {
 
-    instance = nullptr;
+	instance = NULL;
 
-    godot_photo_saver = nil;
-}
-
-
-/*************************************************************************/
-/*  Plugin initialization                                               */
-/*************************************************************************/
-
-extern "C" {
-
-void godot_photosaver_init() {
-
-    Engine::get_singleton()->add_singleton(
-        Engine::Singleton(
-            "PhotoSaver",
-            memnew(PhotoSaver)
-        )
-    );
-}
-
-void godot_photosaver_deinit() {
-
-    if (PhotoSaver::get_singleton()) {
-
-        memdelete(
-            PhotoSaver::get_singleton()
-        );
-    }
-}
-
+	godot_photo_saver = nil;
 }
