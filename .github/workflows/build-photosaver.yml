@@ -12,28 +12,108 @@ jobs:
 
     steps:
 
+      # ==========================================================
+      # 0. CHECKOUT DO REPOSITÓRIO FLUXUS PHOTOSAVER
+      # ==========================================================
+
       - name: Checkout Fluxus PhotoSaver repository
         uses: actions/checkout@v4
 
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
+      # ==========================================================
+      # 1. VERIFICAR AMBIENTE
+      # ==========================================================
 
+      - name: Show environment
+        run: |
+          echo "===== macOS ====="
+          sw_vers
+
+          echo ""
+          echo "===== Architecture ====="
+          uname -m
+
+          echo ""
+          echo "===== Xcode ====="
+          xcodebuild -version
+
+          echo ""
+          echo "===== Xcode Path ====="
+          xcode-select -p
+
+          echo ""
+          echo "===== Clang ====="
+          clang --version
+
+          echo ""
+          echo "===== Git ====="
+          git --version
+
+          echo ""
+          echo "===== Python ====="
+          python3 --version
+
+
+      # ==========================================================
+      # 2. INSTALAR SCONS
+      # ==========================================================
 
       - name: Install SCons
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install scons
+          brew install scons
+          scons --version
 
 
-      - name: Clone Godot iOS Plugins
+      # ==========================================================
+      # 3. VERIFICAR ARQUIVOS DO FLUXUS PHOTOSAVER
+      # ==========================================================
+
+      - name: Verify Fluxus PhotoSaver files
+        shell: bash
+        run: |
+
+          echo "===== Fluxus PhotoSaver files ====="
+
+          find plugins/photo_saver \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+          echo ""
+
+          for file in \
+            plugins/photo_saver/photo_saver.h \
+            plugins/photo_saver/photo_saver.mm \
+            plugins/photo_saver/photo_saver.gdip
+          do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Missing file: $file"
+              exit 1
+            fi
+          done
+
+          echo "All Fluxus PhotoSaver files found."
+
+
+      # ==========================================================
+      # 4. CLONAR GODOT IOS PLUGINS
+      # ==========================================================
+
+      - name: Clone godot-ios-plugins
         run: |
           git clone --recursive \
-            https://github.com/godot-sdk-integrations/godot-ios-plugins.git \
-            godot-ios-plugins
+            https://github.com/godot-sdk-integrations/godot-ios-plugins.git
 
+          cd godot-ios-plugins
+
+          echo ""
+          echo "===== Initial repository commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 5. USAR A MESMA CORREÇÃO DO PHOTOPICKER PARA GODOT 4.6
+      # ==========================================================
 
       - name: Checkout PhotoPicker Godot 4.6 fix
         run: |
@@ -43,6 +123,14 @@ jobs:
 
           git checkout 2d94399
 
+          echo ""
+          echo "===== PhotoPicker commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 6. INICIALIZAR / ATUALIZAR SUBMODULES
+      # ==========================================================
 
       - name: Update submodules
         run: |
@@ -50,6 +138,10 @@ jobs:
 
           git submodule update --init --recursive
 
+
+      # ==========================================================
+      # 7. SELECIONAR GODOT 4.6.3
+      # ==========================================================
 
       - name: Checkout Godot 4.6.3
         run: |
@@ -59,136 +151,546 @@ jobs:
 
           git checkout 4.6.3-stable
 
+          echo ""
+          echo "===== Godot version ====="
+          git describe --tags --always
 
-      - name: Check iOS deployment target
+          echo ""
+          echo "===== Godot commit ====="
+          git rev-parse HEAD
+
+
+      # ==========================================================
+      # 8. INSTALAR NOSSA VERSÃO PERSONALIZADA DO PHOTOSAVER
+      # ==========================================================
+
+      - name: Install custom Fluxus PhotoSaver source
+        shell: bash
         run: |
-          cd godot-ios-plugins
 
-          grep -R "12.0" \
-            SConstruct \
-            godot/platform/ios \
-            scripts \
-            2>/dev/null || true
+          echo "===== Fluxus PhotoSaver source ====="
 
-      - name: Generate Godot iOS headers
-        run: |
-          cd godot-ios-plugins/godot
+          find plugins/photo_saver \
+            -maxdepth 1 \
+            -type f \
+            -print
 
-          scons \
-            platform=ios \
-            target=editor
+          echo ""
+          echo "===== Official PhotoSaver source before replacement ====="
+
+          if [ -d "godot-ios-plugins/plugins/photo_saver" ]; then
+
+            find godot-ios-plugins/plugins/photo_saver \
+              -maxdepth 1 \
+              -type f \
+              -print
+
+          else
+
+            echo "No official PhotoSaver plugin directory."
+
+          fi
 
 
-      - name: Copy PhotoSaver plugin source
-        run: |
+          echo ""
+          echo "===== Creating PhotoSaver plugin directory ====="
+
           rm -rf \
             godot-ios-plugins/plugins/photo_saver
 
           mkdir -p \
             godot-ios-plugins/plugins/photo_saver
 
+
+          echo ""
+          echo "===== Copying Fluxus PhotoSaver files ====="
+
           cp \
             plugins/photo_saver/photo_saver.h \
-            godot-ios-plugins/plugins/photo_saver/
+            godot-ios-plugins/plugins/photo_saver/photo_saver.h
 
           cp \
             plugins/photo_saver/photo_saver.mm \
-            godot-ios-plugins/plugins/photo_saver/
+            godot-ios-plugins/plugins/photo_saver/photo_saver.mm
 
           cp \
             plugins/photo_saver/photo_saver.gdip \
-            godot-ios-plugins/plugins/photo_saver/
+            godot-ios-plugins/plugins/photo_saver/photo_saver.gdip
 
 
-      - name: Register PhotoSaver plugin
+          echo ""
+          echo "===== Installed PhotoSaver source ====="
+
+          find godot-ios-plugins/plugins/photo_saver \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+
+      # ==========================================================
+      # 9. VERIFICAR NOSSA VERSÃO DO PHOTOSAVER
+      # ==========================================================
+
+      - name: Verify custom PhotoSaver source
+        shell: bash
         run: |
+
           cd godot-ios-plugins
 
-          python - <<'PY'
-          from pathlib import Path
 
-          path = Path("SConstruct")
-          text = path.read_text()
+          echo "======================================"
+          echo "PHOTO SAVER GDIP"
+          echo "======================================"
 
-          old = "'photo_picker'"
-          new = "'photo_picker', 'photo_saver'"
+          cat plugins/photo_saver/photo_saver.gdip
 
-          if "'photo_saver'" not in text:
-              if old not in text:
-                  raise SystemExit(
-                      "Não foi encontrada a entrada photo_picker no SConstruct."
-                  )
 
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-              print("PhotoSaver registrado no SConstruct.")
-          else:
-              print("PhotoSaver já está registrado.")
-          PY
+          echo ""
+          echo "======================================"
+          echo "VERIFY Photos.framework"
+          echo "======================================"
 
+          if ! grep -q \
+            'system=\["Photos.framework"\]' \
+            plugins/photo_saver/photo_saver.gdip
+          then
+            echo "ERROR: Photos.framework dependency not found."
+            exit 1
+          fi
+
+          echo "OK: Photos.framework declared."
+
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY PHOTO SAVER SOURCE"
+          echo "======================================"
+
+          if ! grep -q \
+            '#import <Photos/Photos.h>' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: Photos framework header not found."
+            exit 1
+          fi
+
+          if ! grep -q \
+            'PHAssetChangeRequest' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: PHAssetChangeRequest not found."
+            exit 1
+          fi
+
+          echo "OK: PhotoKit source detected."
+
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY IMAGE SUPPORT"
+          echo "======================================"
+
+          if ! grep -q \
+            'creationRequestForAssetFromImageAtFileURL' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: Image save API not found."
+            exit 1
+          fi
+
+          echo "OK: Image save API detected."
+
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY VIDEO SUPPORT"
+          echo "======================================"
+
+          if ! grep -q \
+            'creationRequestForAssetFromVideoAtFileURL' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: Video save API not found."
+            exit 1
+          fi
+
+          echo "OK: Video save API detected."
+
+
+          echo ""
+          echo "======================================"
+          echo "PHOTO SAVER HEADER"
+          echo "======================================"
+
+          sed -n '1,240p' \
+            plugins/photo_saver/photo_saver.h
+
+
+          echo ""
+          echo "======================================"
+          echo "PHOTO SAVER IMPLEMENTATION"
+          echo "======================================"
+
+          sed -n '1,420p' \
+            plugins/photo_saver/photo_saver.mm
+
+
+      # ==========================================================
+      # 10. COMPILAR HEADERS DO GODOT PARA IOS
+      # ==========================================================
+
+      - name: Build Godot iOS headers
+        run: |
+          cd godot-ios-plugins/godot
+
+          scons \
+            platform=ios \
+            target=editor \
+            ios_deployment_target=15.0
+
+
+      # ==========================================================
+      # 11. GERAR XCFRAMEWORK RELEASE
+      # ==========================================================
 
       - name: Build PhotoSaver release xcframework
-        env:
-          IPHONEOS_DEPLOYMENT_TARGET: "14.0"
-      
         run: |
           cd godot-ios-plugins
 
-          ./scripts/generate_xcframework.sh \
-            photo_saver \
-            release \
-            4.0
+          chmod +x scripts/generate_xcframework.sh
 
 
-      - name: Build PhotoSaver debug xcframeworkxcframework
-        env:
-          IPHONEOS_DEPLOYMENT_TARGET: "14.0"
+          # ------------------------------------------------------
+          # ARM64 DEVICE
+          # ------------------------------------------------------
 
-      
+          scons \
+            target=release \
+            arch=arm64 \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # X86_64 SIMULATOR
+          # ------------------------------------------------------
+
+          scons \
+            target=release \
+            arch=x86_64 \
+            simulator=yes \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # ARM64 SIMULATOR
+          # ------------------------------------------------------
+
+          scons \
+            target=release \
+            arch=arm64 \
+            simulator=yes \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # FAT SIMULATOR LIBRARY
+          # ------------------------------------------------------
+
+          lipo -create \
+            "./bin/libphoto_saver.x86_64-simulator.release.a" \
+            "./bin/libphoto_saver.arm64-simulator.release.a" \
+            -output "./bin/libphoto_saver-simulator.release.a"
+
+
+          # ------------------------------------------------------
+          # XCFRAMEWORK
+          # ------------------------------------------------------
+
+          xcodebuild -create-xcframework \
+            -library "./bin/libphoto_saver.arm64-ios.release.a" \
+            -library "./bin/libphoto_saver-simulator.release.a" \
+            -output "./bin/photo_saver.release.xcframework"
+
+
+      # ==========================================================
+      # 12. GERAR XCFRAMEWORK DEBUG
+      # ==========================================================
+
+      - name: Build PhotoSaver debug xcframework
         run: |
           cd godot-ios-plugins
 
-          ./scripts/generate_xcframework.sh \
-            photo_saver \
-            debug \
-            4.0
 
-      - name: Prepare artifact
+          # ------------------------------------------------------
+          # ARM64 DEVICE
+          # ------------------------------------------------------
+
+          scons \
+            target=debug \
+            arch=arm64 \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # X86_64 SIMULATOR
+          # ------------------------------------------------------
+
+          scons \
+            target=debug \
+            arch=x86_64 \
+            simulator=yes \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # ARM64 SIMULATOR
+          # ------------------------------------------------------
+
+          scons \
+            target=debug \
+            arch=arm64 \
+            simulator=yes \
+            plugin=photo_saver \
+            version=4.0 \
+            ios_deployment_target=15.0
+
+
+          # ------------------------------------------------------
+          # FAT SIMULATOR LIBRARY
+          # ------------------------------------------------------
+
+          lipo -create \
+            "./bin/libphoto_saver.x86_64-simulator.debug.a" \
+            "./bin/libphoto_saver.arm64-simulator.debug.a" \
+            -output "./bin/libphoto_saver-simulator.debug.a"
+
+
+          # ------------------------------------------------------
+          # XCFRAMEWORK
+          # ------------------------------------------------------
+
+          xcodebuild -create-xcframework \
+            -library "./bin/libphoto_saver.arm64-ios.debug.a" \
+            -library "./bin/libphoto_saver-simulator.debug.a" \
+            -output "./bin/photo_saver.debug.xcframework"
+
+
+      # ==========================================================
+      # 13. VERIFICAR ARQUIVOS GERADOS
+      # ==========================================================
+
+      - name: Verify generated files
         run: |
+          cd godot-ios-plugins
+
+
+          echo "======================================"
+          echo "XCFRAMEWORKS"
+          echo "======================================"
+
+          find bin \
+            -maxdepth 1 \
+            -name "photo_saver*.xcframework" \
+            -print
+
+
+          echo ""
+          echo "======================================"
+          echo "STATIC LIBRARIES"
+          echo "======================================"
+
+          find bin \
+            -maxdepth 1 \
+            -name "libphoto_saver*.a" \
+            -print
+
+
+          echo ""
+          echo "======================================"
+          echo "GDIP"
+          echo "======================================"
+
+          find plugins/photo_saver \
+            -maxdepth 1 \
+            -name "*.gdip" \
+            -print
+
+
+          echo ""
+          echo "======================================"
+          echo "BIN DIRECTORY"
+          echo "======================================"
+
+          ls -lah bin
+
+
+      # ==========================================================
+      # 14. VALIDAR BUILD
+      # ==========================================================
+
+      - name: Validate build
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+
+          if [ ! -d "bin/photo_saver.release.xcframework" ]; then
+            echo "ERROR: release xcframework was not generated."
+            exit 1
+          fi
+
+
+          if [ ! -d "bin/photo_saver.debug.xcframework" ]; then
+            echo "ERROR: debug xcframework was not generated."
+            exit 1
+          fi
+
+
+          GDIP=$(find plugins/photo_saver \
+            -maxdepth 1 \
+            -name "*.gdip" \
+            -print \
+            -quit)
+
+
+          if [ -z "$GDIP" ]; then
+            echo "ERROR: .gdip file was not found."
+            exit 1
+          fi
+
+
+          if ! grep -q \
+            'system=\["Photos.framework"\]' \
+            "$GDIP"
+          then
+            echo "ERROR: .gdip does not declare Photos.framework."
+            exit 1
+          fi
+
+
+          if ! grep -q \
+            'creationRequestForAssetFromImageAtFileURL' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: Image save implementation not found."
+            exit 1
+          fi
+
+
+          if ! grep -q \
+            'creationRequestForAssetFromVideoAtFileURL' \
+            plugins/photo_saver/photo_saver.mm
+          then
+            echo "ERROR: Video save implementation not found."
+            exit 1
+          fi
+
+
+          echo "Build validation successful."
+
+
+          echo ""
+          echo "Release:"
+          du -sh bin/photo_saver.release.xcframework
+
+
+          echo ""
+          echo "Debug:"
+          du -sh bin/photo_saver.debug.xcframework
+
+
+          echo ""
+          echo "GDIP:"
+          echo "$GDIP"
+
+
+      # ==========================================================
+      # 15. CRIAR PACOTE PARA O FLUXUS
+      # ==========================================================
+
+      - name: Package PhotoSaver
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+
+          rm -rf \
+            ../PhotoSaver-Godot-4.6.3
+
+
           mkdir -p \
-            PhotoSaver-Godot-4.6.3
+            ../PhotoSaver-Godot-4.6.3
 
-          cp \
-            godot-ios-plugins/plugins/photo_saver/photo_saver.gdip \
-            PhotoSaver-Godot-4.6.3/
 
           cp -R \
-            godot-ios-plugins/bin/photo_saver.release.xcframework \
-            PhotoSaver-Godot-4.6.3/
+            bin/photo_saver.release.xcframework \
+            ../PhotoSaver-Godot-4.6.3/
+
 
           cp -R \
-            godot-ios-plugins/bin/photo_saver.debug.xcframework \
-            PhotoSaver-Godot-4.6.3/
+            bin/photo_saver.debug.xcframework \
+            ../PhotoSaver-Godot-4.6.3/
 
 
-      - name: Create BUILD_INFO.txt
-        run: |
-          cat > PhotoSaver-Godot-4.6.3/BUILD_INFO.txt <<'EOF'
-          PhotoSaver Godot iOS Plugin
+          GDIP=$(find plugins/photo_saver \
+            -maxdepth 1 \
+            -name "*.gdip" \
+            -print \
+            -quit)
 
-          Godot:
-          4.6.3-stable
+
+          cp "$GDIP" \
+            ../PhotoSaver-Godot-4.6.3/
+
+
+          cat > ../PhotoSaver-Godot-4.6.3/BUILD_INFO.txt << EOF
+          ==========================================
+          Fluxus PhotoSaver Plugin
+          ==========================================
 
           Plugin:
           PhotoSaver
 
           Function:
-          Save PNG images directly into the iOS Photos library.
+          Save images and videos directly into the iOS Photos library.
 
           Apple API:
           PhotoKit
           PHPhotoLibrary
           PHAssetChangeRequest
+
+          Image API:
+          creationRequestForAssetFromImageAtFileURL
+
+          Video API:
+          creationRequestForAssetFromVideoAtFileURL
+
+          Supported images:
+          PNG
+          JPG
+          JPEG
+          HEIC
+          HEIF
+
+          Supported videos:
+          MP4
+          MOV
+          M4V
+
+          Framework:
+          Photos.framework
 
           Permission:
           NSPhotoLibraryAddUsageDescription
@@ -196,21 +698,90 @@ jobs:
           Camera:
           Not used
 
-          Output:
-          photo_saver.release.xcframework
-          photo_saver.debug.xcframework
-          photo_saver.gdip
+          Godot:
+          4.6.3-stable
 
-          Godot 4.6 compatibility:
-          Yes
+          PhotoPicker compatibility:
+          PR #105
 
-          Source:
-          Custom Fluxus plugin
+          PhotoPicker commit:
+          2d94399
+
+          Repository:
+          https://github.com/godot-sdk-integrations/godot-ios-plugins
+
+          Custom Fluxus source:
+          plugins/photo_saver
+
+          Build:
+          GitHub Actions
+
+          Runner:
+          macos-15-intel
+
+          Architectures:
+          arm64 device
+          arm64 simulator
+          x86_64 simulator
+
+          Generated:
+          $(date -u)
+
+          ==========================================
           EOF
 
 
+      # ==========================================================
+      # 16. MOSTRAR PACOTE
+      # ==========================================================
+
+      - name: Show package
+        run: |
+
+          echo "======================================"
+          echo "FINAL PACKAGE"
+          echo "======================================"
+
+
+          find PhotoSaver-Godot-4.6.3 \
+            -maxdepth 2 \
+            -print
+
+
+          echo ""
+          echo "======================================"
+          echo "PACKAGE SIZE"
+          echo "======================================"
+
+
+          du -sh \
+            PhotoSaver-Godot-4.6.3
+
+
+      # ==========================================================
+      # 17. CRIAR ZIP
+      # ==========================================================
+
+      - name: Create ZIP
+        run: |
+
+          zip -r \
+            PhotoSaver-Godot-4.6.3.zip \
+            PhotoSaver-Godot-4.6.3
+
+
+      # ==========================================================
+      # 18. PUBLICAR ARTIFACT NO GITHUB ACTIONS
+      # ==========================================================
+
       - name: Upload PhotoSaver artifact
         uses: actions/upload-artifact@v4
+
         with:
           name: PhotoSaver-Godot-4.6.3
-          path: PhotoSaver-Godot-4.6.3/
+
+          path: PhotoSaver-Godot-4.6.3.zip
+
+          if-no-files-found: error
+
+          retention-days: 30
