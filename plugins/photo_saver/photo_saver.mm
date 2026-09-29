@@ -40,14 +40,16 @@ PhotoSaver *instance = NULL;
 		return;
 	}
 
-	NSFileManager *file_manager = [NSFileManager defaultManager];
+	NSFileManager *file_manager =
+			[NSFileManager defaultManager];
 
 	if (![file_manager fileExistsAtPath:path]) {
 		NSLog(@"[PhotoSaver] ERROR: File does not exist: %@", path);
 		return;
 	}
 
-	NSURL *file_url = [NSURL fileURLWithPath:path];
+	NSURL *file_url =
+			[NSURL fileURLWithPath:path];
 
 	if (!file_url) {
 		NSLog(@"[PhotoSaver] ERROR: Could not create file URL.");
@@ -87,63 +89,53 @@ PhotoSaver *instance = NULL;
 
 
 	/*********************************************************************/
-	/*  Photo Library authorization                                      */
+	/*  Request Photo Library authorization                               */
 	/*********************************************************************/
 
-	if (@available(iOS 14.0, *)) {
-
-		PHPhotoLibrary *photo_library =
-				[PHPhotoLibrary sharedPhotoLibrary];
-
-		PHAuthorizationStatus status =
-				[photo_library authorizationStatusForAccessLevel:
-						PHAccessLevelAddOnly];
+	PHAuthorizationStatus status =
+			[PHPhotoLibrary authorizationStatus];
 
 
-		if (status == PHAuthorizationStatusNotDetermined) {
+	if (status == PHAuthorizationStatusNotDetermined) {
 
-			NSLog(
-				@"[PhotoSaver] Requesting Add Only authorization."
-			);
+		NSLog(
+			@"[PhotoSaver] Requesting Photo Library authorization."
+		);
 
-			[photo_library
-				requestAuthorizationForAccessLevel:
-					PHAccessLevelAddOnly
-				handler:^(PHAuthorizationStatus new_status) {
 
-					if (new_status == PHAuthorizationStatusAuthorized ||
-						new_status == PHAuthorizationStatusLimited) {
+		[PHPhotoLibrary requestAuthorization:
+			^(PHAuthorizationStatus new_status) {
 
-						dispatch_async(
-							dispatch_get_main_queue(),
-							^{
-								[self saveMediaAtPath:path
-											 filename:filename];
-							}
-						);
+				if (new_status == PHAuthorizationStatusAuthorized) {
 
-					} else {
+					dispatch_async(
+						dispatch_get_main_queue(),
+						^{
+							[self saveMediaAtPath:path
+										 filename:filename];
+						}
+					);
 
-						NSLog(
-							@"[PhotoSaver] Photo Library authorization denied."
-						);
-					}
+				} else {
+
+					NSLog(
+						@"[PhotoSaver] Photo Library authorization denied."
+					);
 				}
-			];
+			}
+		];
 
-			return;
-		}
+		return;
+	}
 
 
-		if (status != PHAuthorizationStatusAuthorized &&
-			status != PHAuthorizationStatusLimited) {
+	if (status != PHAuthorizationStatusAuthorized) {
 
-			NSLog(
-				@"[PhotoSaver] ERROR: Photo Library access not authorized."
-			);
+		NSLog(
+			@"[PhotoSaver] ERROR: Photo Library access not authorized."
+		);
 
-			return;
-		}
+		return;
 	}
 
 
@@ -163,47 +155,49 @@ PhotoSaver *instance = NULL;
 
 
 	[photo_library
-		performChanges:^{
+		performChanges:
+			^{
 
-			if (is_image) {
+				if (is_image) {
 
-				/*****************************************************************/
-				/*  Image                                                         */
-				/*****************************************************************/
+					/*****************************************************************/
+					/*  Image                                                         */
+					/*****************************************************************/
 
-				[PHAssetChangeRequest
-					creationRequestForAssetFromImageAtFileURL:file_url];
+					[PHAssetChangeRequest
+						creationRequestForAssetFromImageAtFileURL:file_url];
 
-			} else {
+				} else {
 
-				/*****************************************************************/
-				/*  Video                                                         */
-				/*****************************************************************/
+					/*****************************************************************/
+					/*  Video                                                         */
+					/*****************************************************************/
 
-				[PHAssetChangeRequest
-					creationRequestForAssetFromVideoAtFileURL:file_url];
+					[PHAssetChangeRequest
+						creationRequestForAssetFromVideoAtFileURL:file_url];
+				}
+
 			}
+		completionHandler:
+			^(BOOL success, NSError *error) {
 
-		}
-		completionHandler:^(BOOL success, NSError *error) {
+				if (success) {
 
-			if (success) {
+					NSLog(
+						@"[PhotoSaver] Successfully saved %@: %@",
+						is_image ? @"image" : @"video",
+						filename
+					);
 
-				NSLog(
-					@"[PhotoSaver] Successfully saved %@: %@",
-					is_image ? @"image" : @"video",
-					filename
-				);
+				} else {
 
-			} else {
-
-				NSLog(
-					@"[PhotoSaver] ERROR saving %@: %@",
-					is_image ? @"image" : @"video",
-					error
-				);
+					NSLog(
+						@"[PhotoSaver] ERROR saving %@: %@",
+						is_image ? @"image" : @"video",
+						error
+					);
+				}
 			}
-		}
 	];
 }
 
