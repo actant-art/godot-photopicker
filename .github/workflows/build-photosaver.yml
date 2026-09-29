@@ -228,7 +228,55 @@ jobs:
 
 
       # ==========================================================
-      # 9. VERIFICAR NOSSA VERSÃO DO PHOTOSAVER
+      # 9.a REGISTRAR PHOTOSAVER NO SCONSTRUCT
+      # ==========================================================
+
+      - name: Register PhotoSaver plugin
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+          echo "===== Registering PhotoSaver in SConstruct ====="
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("SConstruct")
+          text = path.read_text()
+
+          if "'photo_saver'" in text:
+              print("PhotoSaver is already registered.")
+              raise SystemExit(0)
+
+          old = "'photo_picker'"
+          new = "'photo_picker', 'photo_saver'"
+
+          if old not in text:
+              raise SystemExit(
+                  "ERROR: Could not find 'photo_picker' in SConstruct."
+              )
+
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+
+          print("PhotoSaver registered successfully.")
+          PY
+
+          echo ""
+          echo "===== Verify PhotoSaver registration ====="
+
+          grep -n \
+            "photo_picker.*photo_saver" \
+            SConstruct
+
+          echo ""
+          echo "===== SConstruct plugin registration complete ====="
+
+
+      # ==========================================================
+      # 9.b VERIFICAR NOSSA VERSÃO DO PHOTOSAVER
       # ==========================================================
 
       - name: Verify custom PhotoSaver source
