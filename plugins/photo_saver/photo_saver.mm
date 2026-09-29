@@ -444,7 +444,15 @@ PhotoSaver *instance = nullptr;
 
 
 /*************************************************************************/
-/*  Godot bindings                                                      */
+/*  Godot C API                                                          */
+/*************************************************************************/
+
+extern "C" void godot_photosaver_init();
+extern "C" void godot_photosaver_deinit();
+
+
+/*************************************************************************/
+/*  Godot bindings                                                       */
 /*************************************************************************/
 
 void PhotoSaver::_bind_methods() {
@@ -599,7 +607,9 @@ PhotoSaver::~PhotoSaver() {
 /*  Plugin initialization                                               */
 /*************************************************************************/
 
-extern "C" void godot_photosaver_init() {
+extern "C" {
+
+void godot_photosaver_init() {
 
     Engine::get_singleton()->add_singleton(
         Engine::Singleton(
@@ -609,8 +619,7 @@ extern "C" void godot_photosaver_init() {
     );
 }
 
-
-extern "C" void godot_photosaver_deinit() {
+void godot_photosaver_deinit() {
 
     if (PhotoSaver::get_singleton()) {
 
@@ -618,4 +627,6 @@ extern "C" void godot_photosaver_deinit() {
             PhotoSaver::get_singleton()
         );
     }
+}
+
 }
