@@ -8,10 +8,11 @@ deinitialization="godot_photopicker_deinit"
 [dependencies]
 linked=[]
 embedded=[]
-system=["PhotosUI.framework"]
+system=["Photos.framework", "PhotosUI.framework"]
 
 capabilities=[]
 
 files=[]
 
 [plist]
+NSPhotoLibraryAddUsageDescription:string_input="Fluxus precisa de acesso para salvar as imagens criadas no Fotos."
