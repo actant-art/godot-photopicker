@@ -456,64 +456,66 @@ jobs:
             2>/dev/null \
             || true
 
-          # ==========================================================
-          # 9.2 AJUSTAR IOS DEPLOYMENT TARGET DO PHOTOPICKER
-          # ==========================================================
-          
-          - name: Set PhotoPicker iOS deployment target
-            shell: bash
-            run: |
-          
-              cd godot-ios-plugins
-          
-              echo "======================================"
-              echo "CURRENT IOS DEPLOYMENT TARGET"
-              echo "======================================"
-          
-              grep -n \
-                -E \
-                'mios-simulator-version-min|miphoneos-version-min' \
-                SConstruct \
-                || true
-          
-              echo ""
-              echo "======================================"
-              echo "SETTING IOS DEPLOYMENT TARGET TO 15.0"
-              echo "======================================"
-          
-              sed -i '' \
-                's/-mios-simulator-version-min=12\.0/-mios-simulator-version-min=15.0/g' \
-                SConstruct
-          
-              sed -i '' \
-                's/-miphoneos-version-min=12\.0/-miphoneos-version-min=15.0/g' \
-                SConstruct
-          
-              echo ""
-              echo "======================================"
-              echo "VERIFY IOS DEPLOYMENT TARGET"
-              echo "======================================"
-          
-              grep -n \
-                -E \
-                'mios-simulator-version-min|miphoneos-version-min' \
-                SConstruct
-          
-              echo ""
-              echo "======================================"
-              echo "VERIFY NO IOS 12 TARGET REMAINS"
-              echo "======================================"
-          
-              if grep -q \
-                -E \
-                'mios-simulator-version-min=12\.0|miphoneos-version-min=12\.0' \
-                SConstruct
-              then
-                echo "ERROR: iOS 12 deployment target still present."
-                exit 1
-              fi
-          
-              echo "OK: PhotoPicker deployment target is iOS 15.0."
+
+      # ==========================================================
+      # 9.2 AJUSTAR IOS DEPLOYMENT TARGET DO PHOTOPICKER
+      # ==========================================================
+
+      - name: Set PhotoPicker iOS deployment target
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+          echo "======================================"
+          echo "CURRENT IOS DEPLOYMENT TARGET"
+          echo "======================================"
+
+          grep -n \
+            -E \
+            'mios-simulator-version-min|miphoneos-version-min' \
+            SConstruct \
+            || true
+
+          echo ""
+          echo "======================================"
+          echo "SETTING IOS DEPLOYMENT TARGET TO 15.0"
+          echo "======================================"
+
+          sed -i '' \
+            's/-mios-simulator-version-min=12\.0/-mios-simulator-version-min=15.0/g' \
+            SConstruct
+
+          sed -i '' \
+            's/-miphoneos-version-min=12\.0/-miphoneos-version-min=15.0/g' \
+            SConstruct
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY IOS DEPLOYMENT TARGET"
+          echo "======================================"
+
+          grep -n \
+            -E \
+            'mios-simulator-version-min|miphoneos-version-min' \
+            SConstruct
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY NO IOS 12 TARGET REMAINS"
+          echo "======================================"
+
+          if grep -q \
+            -E \
+            'mios-simulator-version-min=12\.0|miphoneos-version-min=12\.0' \
+            SConstruct
+          then
+            echo "ERROR: iOS 12 deployment target still present."
+            exit 1
+          fi
+
+          echo "OK: PhotoPicker deployment target is iOS 15.0."
+
 
       # ==========================================================
       # 10. COMPILAR HEADERS DO GODOT PARA IOS
