@@ -477,12 +477,40 @@ void PhotoPicker::_bind_methods() {
 			D_METHOD("present_multiple", "selection_limit"),
 			&PhotoPicker::present_multiple);
 
+	ClassDB::bind_method(
+			D_METHOD("save_image", "path", "filename"),
+			&PhotoPicker::save_image);
+
+	ClassDB::bind_method(
+			D_METHOD("save_video", "path", "filename"),
+			&PhotoPicker::save_video);
+
 	ADD_SIGNAL(
 			MethodInfo(
 					"images_picked",
 					PropertyInfo(
 							Variant::ARRAY,
 							"images")));
+
+	ADD_SIGNAL(
+			MethodInfo(
+					"image_saved",
+					PropertyInfo(
+							Variant::BOOL,
+							"success"),
+					PropertyInfo(
+							Variant::STRING,
+							"message")));
+
+	ADD_SIGNAL(
+			MethodInfo(
+					"video_saved",
+					PropertyInfo(
+							Variant::BOOL,
+							"success"),
+					PropertyInfo(
+							Variant::STRING,
+							"message")));
 }
 
 
@@ -498,6 +526,316 @@ void PhotoPicker::select_images(Array images) {
 	emit_signal(
 			"images_picked",
 			images);
+}
+
+void PhotoPicker::save_image(
+		const String &path,
+		const String &filename) {
+
+	NSString *ns_path =
+			[NSString stringWithUTF8String:path.utf8().get_data()];
+
+	NSString *ns_filename =
+			[NSString stringWithUTF8String:filename.utf8().get_data()];
+
+	if (!ns_path || !ns_filename) {
+		emit_image_saved(
+				false,
+				"Invalid image path or filename.");
+		return;
+	}
+
+	NSURL *file_url =
+			[NSURL fileURLWithPath:ns_path];
+
+	if (![[NSFileManager defaultManager]
+			fileExistsAtPath:ns_path]) {
+
+		emit_image_saved(
+				false,
+				[NSString stringWithFormat:
+					@"Image file not found: %@",
+					ns_filename]);
+
+		return;
+	}
+
+	PHPhotoLibrary *photo_library =
+			[PHPhotoLibrary sharedPhotoLibrary];
+
+	PHAuthorizationStatus status =
+			[PHPhotoLibrary
+					authorizationStatusForAccessLevel:
+							PHAccessLevelAddOnly];
+
+	if (status == PHAuthorizationStatusNotDetermined) {
+
+		[PHPhotoLibrary
+				requestAuthorizationForAccessLevel:
+						PHAccessLevelAddOnly
+				handler:^(PHAuthorizationStatus new_status) {
+
+					dispatch_async(
+							dispatch_get_main_queue(),
+							^{
+								if (new_status ==
+										PHAuthorizationStatusAuthorized) {
+
+									[photo_library
+											performChanges:^{
+												[PHAssetChangeRequest
+														creationRequestForAssetFromImageAtFileURL:
+																file_url];
+											}
+											completionHandler:
+													^(BOOL success,
+															NSError *error) {
+
+														dispatch_async(
+																dispatch_get_main_queue(),
+																^{
+																	if (success) {
+																		PhotoPicker::get_singleton()
+																				->emit_image_saved(
+																						true,
+																						"");
+																	} else {
+																		NSString *message =
+																				error ?
+																						error.localizedDescription :
+																						@"Unknown Photos error.";
+
+																		PhotoPicker::get_singleton()
+																				->emit_image_saved(
+																						false,
+																						String::utf8(
+																								message.UTF8String));
+																	}
+																});
+													}];
+
+								} else {
+
+									PhotoPicker::get_singleton()
+											->emit_image_saved(
+													false,
+													"Photo Library permission denied.");
+								}
+							});
+				}];
+
+		return;
+	}
+
+	if (status != PHAuthorizationStatusAuthorized) {
+
+		emit_image_saved(
+				false,
+				"Photo Library permission denied.");
+
+		return;
+	}
+
+	[photo_library
+			performChanges:^{
+				[PHAssetChangeRequest
+						creationRequestForAssetFromImageAtFileURL:
+								file_url];
+			}
+			completionHandler:^(BOOL success, NSError *error) {
+
+				dispatch_async(
+						dispatch_get_main_queue(),
+						^{
+							if (success) {
+
+								PhotoPicker::get_singleton()
+										->emit_image_saved(
+												true,
+												"");
+
+							} else {
+
+								NSString *message =
+										error ?
+												error.localizedDescription :
+												@"Unknown Photos error.";
+
+								PhotoPicker::get_singleton()
+										->emit_image_saved(
+												false,
+												String::utf8(
+														message.UTF8String));
+							}
+						});
+			}];
+}
+
+void PhotoPicker::save_video(
+		const String &path,
+		const String &filename) {
+
+	NSString *ns_path =
+			[NSString stringWithUTF8String:path.utf8().get_data()];
+
+	NSString *ns_filename =
+			[NSString stringWithUTF8String:filename.utf8().get_data()];
+
+	if (!ns_path || !ns_filename) {
+		emit_video_saved(
+				false,
+				"Invalid video path or filename.");
+		return;
+	}
+
+	NSURL *file_url =
+			[NSURL fileURLWithPath:ns_path];
+
+	if (![[NSFileManager defaultManager]
+			fileExistsAtPath:ns_path]) {
+
+		emit_video_saved(
+				false,
+				[NSString stringWithFormat:
+					@"Video file not found: %@",
+					ns_filename]);
+
+		return;
+	}
+
+	PHPhotoLibrary *photo_library =
+			[PHPhotoLibrary sharedPhotoLibrary];
+
+	PHAuthorizationStatus status =
+			[PHPhotoLibrary
+					authorizationStatusForAccessLevel:
+							PHAccessLevelAddOnly];
+
+	if (status == PHAuthorizationStatusNotDetermined) {
+
+		[PHPhotoLibrary
+				requestAuthorizationForAccessLevel:
+						PHAccessLevelAddOnly
+				handler:^(PHAuthorizationStatus new_status) {
+
+					dispatch_async(
+							dispatch_get_main_queue(),
+							^{
+								if (new_status ==
+										PHAuthorizationStatusAuthorized) {
+
+									[photo_library
+											performChanges:^{
+												[PHAssetChangeRequest
+														creationRequestForAssetFromVideoAtFileURL:
+																file_url];
+											}
+											completionHandler:
+													^(BOOL success,
+															NSError *error) {
+
+														dispatch_async(
+																dispatch_get_main_queue(),
+																^{
+																	if (success) {
+
+																		PhotoPicker::get_singleton()
+																				->emit_video_saved(
+																						true,
+																						"");
+
+																	} else {
+
+																		NSString *message =
+																				error ?
+																						error.localizedDescription :
+																						@"Unknown Photos error.";
+
+																		PhotoPicker::get_singleton()
+																				->emit_video_saved(
+																						false,
+																						String::utf8(
+																								message.UTF8String));
+																	}
+																});
+													}];
+
+								} else {
+
+									PhotoPicker::get_singleton()
+											->emit_video_saved(
+													false,
+													"Photo Library permission denied.");
+								}
+							});
+				}];
+
+		return;
+	}
+
+	if (status != PHAuthorizationStatusAuthorized) {
+
+		emit_video_saved(
+				false,
+				"Photo Library permission denied.");
+
+		return;
+	}
+
+	[photo_library
+			performChanges:^{
+				[PHAssetChangeRequest
+						creationRequestForAssetFromVideoAtFileURL:
+								file_url];
+			}
+			completionHandler:^(BOOL success, NSError *error) {
+
+				dispatch_async(
+						dispatch_get_main_queue(),
+						^{
+							if (success) {
+
+								PhotoPicker::get_singleton()
+										->emit_video_saved(
+												true,
+												"");
+
+							} else {
+
+								NSString *message =
+										error ?
+												error.localizedDescription :
+												@"Unknown Photos error.";
+
+								PhotoPicker::get_singleton()
+										->emit_video_saved(
+												false,
+												String::utf8(
+														message.UTF8String));
+							}
+						});
+			}];
+}
+
+void PhotoPicker::emit_image_saved(
+		bool success,
+		const String &message) {
+
+	emit_signal(
+			"image_saved",
+			success,
+			message);
+}
+
+
+void PhotoPicker::emit_video_saved(
+		bool success,
+		const String &message) {
+
+	emit_signal(
+			"video_saved",
+			success,
+			message);
 }
 
 
