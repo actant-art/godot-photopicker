@@ -270,80 +270,159 @@ jobs:
             --exclude-dir=.git \
             || true
 
-            
-      # ==========================================================
-      # 9. VERIFICAR NOSSA VERSÃO DO PHOTOPICKER
-      # ==========================================================
-
-      - name: Verify custom PhotoPicker source
-        shell: bash
-        run: |
-
-          cd godot-ios-plugins
-
-          echo "======================================"
-          echo "PHOTO PICKER GDIP"
-          echo "======================================"
-
-          cat plugins/photo_picker/photo_picker.gdip
-
-          echo ""
-          echo "======================================"
-          echo "VERIFY PhotosUI.framework"
-          echo "======================================"
-
-          if ! grep -q \
-            'system=\["PhotosUI.framework"\]' \
-            plugins/photo_picker/photo_picker.gdip
-          then
-            echo "ERROR: PhotosUI.framework dependency not found."
-            exit 1
-          fi
-
-          echo "OK: PhotosUI.framework declared."
-
-
-          echo ""
-          echo "======================================"
-          echo "VERIFY PHPICKER SOURCE"
-          echo "======================================"
-
-          if ! grep -q \
-            'PhotosUI/PhotosUI.h' \
-            plugins/photo_picker/photo_picker.mm
-          then
-            echo "ERROR: PhotosUI header not found."
-            exit 1
-          fi
-
-          if ! grep -q \
-            'PHPickerViewController' \
-            plugins/photo_picker/photo_picker.mm
-          then
-            echo "ERROR: PHPickerViewController not found."
-            exit 1
-          fi
-
-          echo "OK: PHPicker source detected."
-
-
-          echo ""
-          echo "======================================"
-          echo "PHOTO PICKER HEADER"
-          echo "======================================"
-
-          sed -n '1,240p' \
-            plugins/photo_picker/photo_picker.h
-
-
-          echo ""
-          echo "======================================"
-          echo "PHOTO PICKER IMPLEMENTATION"
-          echo "======================================"
-
-          sed -n '1,360p' \
-            plugins/photo_picker/photo_picker.mm
-
+          # ==========================================================
+          # 9. VERIFICAR NOSSA VERSÃO DO PHOTOPICKER
+          # ==========================================================
+          
+          - name: Verify custom PhotoPicker source
+            shell: bash
+            run: |
+          
+              cd godot-ios-plugins
+          
+              echo "======================================"
+              echo "PHOTO PICKER GDIP"
+              echo "======================================"
+          
+              cat plugins/photo_picker/photo_picker.gdip
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY IOS FRAMEWORKS"
+              echo "======================================"
+          
+              grep -q 'Photos.framework' \
+                plugins/photo_picker/photo_picker.gdip \
+                || {
+                  echo "ERROR: Photos.framework not declared."
+                  exit 1
+                }
+          
+              grep -q 'PhotosUI.framework' \
+                plugins/photo_picker/photo_picker.gdip \
+                || {
+                  echo "ERROR: PhotosUI.framework not declared."
+                  exit 1
+                }
+          
+              echo "OK: Photos.framework"
+              echo "OK: PhotosUI.framework"
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTO LIBRARY PERMISSION"
+              echo "======================================"
+          
+              grep -q 'NSPhotoLibraryAddUsageDescription' \
+                plugins/photo_picker/photo_picker.gdip \
+                || {
+                  echo "ERROR: NSPhotoLibraryAddUsageDescription not declared."
+                  exit 1
+                }
+          
+              echo "OK: NSPhotoLibraryAddUsageDescription"
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHPICKER SOURCE"
+              echo "======================================"
+          
+              grep -q 'PhotosUI/PhotosUI.h' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: PhotosUI header not found."
+                  exit 1
+                }
+          
+              grep -q 'PHPickerViewController' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: PHPickerViewController not found."
+                  exit 1
+                }
+          
+              echo "OK: PHPicker source detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTOS SAVE SOURCE"
+              echo "======================================"
+          
+              grep -q 'Photos/Photos.h' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: Photos header not found."
+                  exit 1
+                }
+          
+              grep -q 'PHPhotoLibrary' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: PHPhotoLibrary not found."
+                  exit 1
+                }
+          
+              grep -q 'creationRequestForAssetFromImageAtFileURL' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: Image save API not found."
+                  exit 1
+                }
+          
+              grep -q 'creationRequestForAssetFromVideoAtFileURL' \
+                plugins/photo_picker/photo_picker.mm \
+                || {
+                  echo "ERROR: Video save API not found."
+                  exit 1
+                }
+          
+              echo "OK: Photos save implementation detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTO SAVE API"
+              echo "======================================"
+          
+              for symbol in \
+                'save_image' \
+                'save_video' \
+                'emit_image_saved' \
+                'emit_video_saved' \
+                'image_saved' \
+                'video_saved'
+              do
+                if ! grep -q "$symbol" plugins/photo_picker/photo_picker.h \
+                   && ! grep -q "$symbol" plugins/photo_picker/photo_picker.mm
+                then
+                  echo "ERROR: Photo save API symbol not found: $symbol"
+                  exit 1
+                fi
+              done
+          
+              echo "OK: Photo save API detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "PHOTO PICKER HEADER"
+              echo "======================================"
+          
+              sed -n '1,240p' \
+                plugins/photo_picker/photo_picker.h
+          
+          
+              echo ""
+              echo "======================================"
+              echo "PHOTO PICKER IMPLEMENTATION"
+              echo "======================================"
+          
+              sed -n '1,520p' \
+                plugins/photo_picker/photo_picker.mm
 
       # ==========================================================
       # 9.1 VERIFICAR IOS DEPLOYMENT TARGET DO GODOT
@@ -564,60 +643,224 @@ jobs:
 
           ls -lah bin
 
-
-      # ==========================================================
-      # 14. VALIDAR BUILD
-      # ==========================================================
-
-      - name: Validate build
-        shell: bash
-        run: |
-
-          cd godot-ios-plugins
-
-          if [ ! -d "bin/photo_picker.release.xcframework" ]; then
-            echo "ERROR: release xcframework was not generated."
-            exit 1
-          fi
-
-          if [ ! -d "bin/photo_picker.debug.xcframework" ]; then
-            echo "ERROR: debug xcframework was not generated."
-            exit 1
-          fi
-
-          GDIP=$(find plugins/photo_picker \
-            -maxdepth 1 \
-            -name "*.gdip" \
-            -print \
-            -quit)
-
-          if [ -z "$GDIP" ]; then
-            echo "ERROR: .gdip file was not found."
-            exit 1
-          fi
-
-          if ! grep -q \
-            'system=\["PhotosUI.framework"\]' \
-            "$GDIP"
-          then
-            echo "ERROR: .gdip does not declare PhotosUI.framework."
-            exit 1
-          fi
-
-          echo "Build validation successful."
-
-          echo ""
-          echo "Release:"
-          du -sh bin/photo_picker.release.xcframework
-
-          echo ""
-          echo "Debug:"
-          du -sh bin/photo_picker.debug.xcframework
-
-          echo ""
-          echo "GDIP:"
-          echo "$GDIP"
-
+          # ==========================================================
+          # 14. VALIDAR XCFRAMEWORK E GDIP
+          # ==========================================================
+          
+          - name: Validate XCFramework and GDIP
+            shell: bash
+            run: |
+          
+              cd godot-ios-plugins
+          
+              echo "======================================"
+              echo "VALIDATE RELEASE XCFRAMEWORK"
+              echo "======================================"
+          
+              RELEASE_XCFRAMEWORK="plugins/photo_picker/photo_picker.release.xcframework"
+          
+              if [ ! -d "$RELEASE_XCFRAMEWORK" ]; then
+                echo "ERROR: Release XCFramework not found."
+                exit 1
+              fi
+          
+              echo "OK: Release XCFramework exists."
+          
+              find "$RELEASE_XCFRAMEWORK" \
+                -maxdepth 3 \
+                -type f \
+                | sort
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VALIDATE DEBUG XCFRAMEWORK"
+              echo "======================================"
+          
+              DEBUG_XCFRAMEWORK="plugins/photo_picker/photo_picker.debug.xcframework"
+          
+              if [ ! -d "$DEBUG_XCFRAMEWORK" ]; then
+                echo "ERROR: Debug XCFramework not found."
+                exit 1
+              fi
+          
+              echo "OK: Debug XCFramework exists."
+          
+              find "$DEBUG_XCFRAMEWORK" \
+                -maxdepth 3 \
+                -type f \
+                | sort
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VALIDATE GDIP"
+              echo "======================================"
+          
+              GDIP="plugins/photo_picker/photo_picker.gdip"
+          
+              if [ ! -f "$GDIP" ]; then
+                echo "ERROR: .gdip file not found."
+                exit 1
+              fi
+          
+              echo "OK: .gdip exists."
+          
+              cat "$GDIP"
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY GDIP FRAMEWORKS"
+              echo "======================================"
+          
+              if ! grep -q 'Photos.framework' "$GDIP"; then
+                echo "ERROR: .gdip does not declare Photos.framework."
+                exit 1
+              fi
+          
+              if ! grep -q 'PhotosUI.framework' "$GDIP"; then
+                echo "ERROR: .gdip does not declare PhotosUI.framework."
+                exit 1
+              fi
+          
+              echo "OK: Photos.framework declared."
+              echo "OK: PhotosUI.framework declared."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTO LIBRARY PERMISSION"
+              echo "======================================"
+          
+              if ! grep -q 'NSPhotoLibraryAddUsageDescription' "$GDIP"; then
+                echo "ERROR: .gdip does not declare NSPhotoLibraryAddUsageDescription."
+                exit 1
+              fi
+          
+              echo "OK: NSPhotoLibraryAddUsageDescription declared."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY GDIP INITIALIZATION"
+              echo "======================================"
+          
+              if ! grep -q 'initialization="godot_photopicker_init"' "$GDIP"; then
+                echo "ERROR: PhotoPicker initialization function not declared."
+                exit 1
+              fi
+          
+              if ! grep -q 'deinitialization="godot_photopicker_deinit"' "$GDIP"; then
+                echo "ERROR: PhotoPicker deinitialization function not declared."
+                exit 1
+              fi
+          
+              echo "OK: PhotoPicker initialization declared."
+              echo "OK: PhotoPicker deinitialization declared."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTO PICKER SOURCE"
+              echo "======================================"
+          
+              if ! grep -q 'PhotosUI/PhotosUI.h' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: PhotosUI header not found."
+                exit 1
+              fi
+          
+              if ! grep -q 'PHPickerViewController' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: PHPickerViewController not found."
+                exit 1
+              fi
+          
+              echo "OK: PHPicker source detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTOS SAVE SOURCE"
+              echo "======================================"
+          
+              if ! grep -q 'Photos/Photos.h' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: Photos header not found."
+                exit 1
+              fi
+          
+              if ! grep -q 'PHPhotoLibrary' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: PHPhotoLibrary not found."
+                exit 1
+              fi
+          
+              if ! grep -q 'creationRequestForAssetFromImageAtFileURL' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: Image save API not found."
+                exit 1
+              fi
+          
+              if ! grep -q 'creationRequestForAssetFromVideoAtFileURL' \
+                plugins/photo_picker/photo_picker.mm
+              then
+                echo "ERROR: Video save API not found."
+                exit 1
+              fi
+          
+              echo "OK: Photos image save API detected."
+              echo "OK: Photos video save API detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VERIFY PHOTO SAVE API"
+              echo "======================================"
+          
+              for symbol in \
+                'save_image' \
+                'save_video' \
+                'emit_image_saved' \
+                'emit_video_saved' \
+                'image_saved' \
+                'video_saved'
+              do
+                if ! grep -q "$symbol" \
+                  plugins/photo_picker/photo_picker.h \
+                  && ! grep -q "$symbol" \
+                  plugins/photo_picker/photo_picker.mm
+                then
+                  echo "ERROR: Photo save API symbol not found: $symbol"
+                  exit 1
+                fi
+              done
+          
+              echo "OK: Photo save API detected."
+          
+          
+              echo ""
+              echo "======================================"
+              echo "VALIDATION COMPLETE"
+              echo "======================================"
+          
+              echo "OK: Release XCFramework"
+              echo "OK: Debug XCFramework"
+              echo "OK: Photos.framework"
+              echo "OK: PhotosUI.framework"
+              echo "OK: NSPhotoLibraryAddUsageDescription"
+              echo "OK: PhotoPicker initialization"
+              echo "OK: PhotoPicker deinitialization"
+              echo "OK: PHPicker source"
+              echo "OK: Image save source"
+              echo "OK: Video save source"
+              echo "OK: Photo save API"
 
       # ==========================================================
       # 15. CRIAR PACOTE PARA O FLUXUS
@@ -661,7 +904,8 @@ jobs:
           Implementation:
           PHPickerViewController
 
-          Framework:
+          Frameworks:
+          Photos.framework
           PhotosUI.framework
 
           Godot:
@@ -684,7 +928,9 @@ jobs:
           Premium: 12 images
 
           Media:
-          Images only
+          Images selected from Photos
+          Images saved to Photos
+          Videos saved to Photos
 
           Camera:
           Not used
