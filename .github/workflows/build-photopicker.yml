@@ -355,7 +355,7 @@ jobs:
 
           scons \
             platform=ios \
-            target=editor
+            target=editor \
             ios_deployment_target=15.0
 
       # ==========================================================
