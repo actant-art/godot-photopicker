@@ -37,6 +37,7 @@
 #include "core/io/image.h"
 #include "core/object/object.h"
 #include "core/variant/array.h"
+#include "core/string/ustring.h"
 #else
 #include "core/image.h"
 #include "core/object.h"
@@ -75,8 +76,20 @@ public:
 	 */
 	void select_images(Array images);
 
-	PhotoPicker();
+    void save_image(
+        const String &path,
+        const String &filename
+    );
 
+    void save_video(
+        const String &path,
+        const String &filename
+    );
+
+	void emit_image_saved(const String &filename);
+	void emit_video_saved(const String &filename);
+
+	PhotoPicker();
 	~PhotoPicker();
 
 	static PhotoPicker *get_singleton();
