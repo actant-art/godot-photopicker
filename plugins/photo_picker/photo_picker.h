@@ -60,34 +60,47 @@ class PhotoPicker : public Object {
 public:
 	/*
 	 * Abre o seletor de fotos do iOS usando PHPickerViewController.
-	 *
-	 * selection_limit:
-	 *   1  = uma imagem
-	 *   3  = limite do Fluxus Free
-	 *   12 = limite do Fluxus Premium
-	 *
-	 * O limite também é protegido no código nativo.
 	 */
 	void present_multiple(int selection_limit);
 
 	/*
-	 * Recebe as imagens selecionadas pelo PHPicker e emite
-	 * o sinal "images_picked".
+	 * Recebe as imagens selecionadas pelo PHPicker e
+	 * emite o sinal "images_picked".
 	 */
 	void select_images(Array images);
 
-    void save_image(
-        const String &path,
-        const String &filename
-    );
+	/*
+	 * Salva uma imagem no Fotos do iOS.
+	 */
+	void save_image(
+			const String &path,
+			const String &filename);
 
-    void save_video(
-        const String &path,
-        const String &filename
-    );
+	/*
+	 * Salva um vídeo no Fotos do iOS.
+	 */
+	void save_video(
+			const String &path,
+			const String &filename);
 
-	void emit_image_saved(const String &filename);
-	void emit_video_saved(const String &filename);
+	/*
+	 * Emite o resultado da operação de salvamento da imagem.
+	 *
+	 * success = true  -> imagem salva com sucesso
+	 * success = false -> falha
+	 *
+	 * message contém uma mensagem técnica para diagnóstico.
+	 */
+	void emit_image_saved(
+			bool success,
+			const String &message);
+
+	/*
+	 * Emite o resultado da operação de salvamento do vídeo.
+	 */
+	void emit_video_saved(
+			bool success,
+			const String &message);
 
 	PhotoPicker();
 	~PhotoPicker();
