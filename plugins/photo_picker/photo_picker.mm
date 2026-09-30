@@ -633,7 +633,7 @@ void PhotoPicker::save_image(
 
 		emit_image_saved(
 				false,
-				"Photo Library permission denied.");
+				String("Photo Library permission denied."));
 
 		return;
 	}
