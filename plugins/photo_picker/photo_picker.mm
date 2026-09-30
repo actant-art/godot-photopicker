@@ -541,7 +541,7 @@ void PhotoPicker::save_image(
 	if (!ns_path || !ns_filename) {
 		emit_image_saved(
 				false,
-				"Invalid image path or filename.");
+				String("Invalid image path or filename."));
 		return;
 	}
 
@@ -551,11 +551,13 @@ void PhotoPicker::save_image(
 	if (![[NSFileManager defaultManager]
 			fileExistsAtPath:ns_path]) {
 
+		NSString *error_message = [NSString stringWithFormat:
+				@"Image file not found: %@",
+				ns_filename];
+		
 		emit_image_saved(
 				false,
-				[NSString stringWithFormat:
-					@"Image file not found: %@",
-					ns_filename]);
+				String::utf8([error_message UTF8String]));
 
 		return;
 	}
@@ -598,18 +600,18 @@ void PhotoPicker::save_image(
 																		PhotoPicker::get_singleton()
 																				->emit_image_saved(
 																						true,
-																						"");
+																						String(""));
 																	} else {
 																		NSString *message =
 																				error ?
 																						error.localizedDescription :
 																						@"Unknown Photos error.";
-
+														
 																		PhotoPicker::get_singleton()
 																				->emit_image_saved(
 																						false,
 																						String::utf8(
-																								message.UTF8String));
+																								[message UTF8String]));
 																	}
 																});
 													}];
@@ -619,7 +621,7 @@ void PhotoPicker::save_image(
 									PhotoPicker::get_singleton()
 											->emit_image_saved(
 													false,
-													"Photo Library permission denied.");
+													String("Photo Library permission denied."));
 								}
 							});
 				}];
@@ -652,7 +654,7 @@ void PhotoPicker::save_image(
 								PhotoPicker::get_singleton()
 										->emit_image_saved(
 												true,
-												"");
+												String(""));
 
 							} else {
 
@@ -684,7 +686,7 @@ void PhotoPicker::save_video(
 	if (!ns_path || !ns_filename) {
 		emit_video_saved(
 				false,
-				"Invalid video path or filename.");
+				String("Invalid video path or filename."));
 		return;
 	}
 
@@ -694,11 +696,13 @@ void PhotoPicker::save_video(
 	if (![[NSFileManager defaultManager]
 			fileExistsAtPath:ns_path]) {
 
+		NSString *error_message = [NSString stringWithFormat:
+				@"Video file not found: %@",
+				ns_filename];
+		
 		emit_video_saved(
 				false,
-				[NSString stringWithFormat:
-					@"Video file not found: %@",
-					ns_filename]);
+				String::utf8([error_message UTF8String]));
 
 		return;
 	}
@@ -742,7 +746,7 @@ void PhotoPicker::save_video(
 																		PhotoPicker::get_singleton()
 																				->emit_video_saved(
 																						true,
-																						"");
+																						String(""));
 
 																	} else {
 
@@ -765,7 +769,7 @@ void PhotoPicker::save_video(
 									PhotoPicker::get_singleton()
 											->emit_video_saved(
 													false,
-													"Photo Library permission denied.");
+													String("Photo Library permission denied."));
 								}
 							});
 				}];
@@ -777,7 +781,7 @@ void PhotoPicker::save_video(
 
 		emit_video_saved(
 				false,
-				"Photo Library permission denied.");
+				String("Photo Library permission denied."));
 
 		return;
 	}
@@ -798,7 +802,7 @@ void PhotoPicker::save_video(
 								PhotoPicker::get_singleton()
 										->emit_video_saved(
 												true,
-												"");
+												String(""));
 
 							} else {
 
