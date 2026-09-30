@@ -667,7 +667,7 @@ void PhotoPicker::save_image(
 										->emit_image_saved(
 												false,
 												String::utf8(
-														message UTF8String));
+														[message UTF8String]);
 							}
 						});
 			}];
@@ -759,7 +759,7 @@ void PhotoPicker::save_video(
 																				->emit_video_saved(
 																						false,
 																						String::utf8(
-																								message UTF8String));
+																								[message UTF8String]);
 																	}
 																});
 													}];
@@ -815,7 +815,7 @@ void PhotoPicker::save_video(
 										->emit_video_saved(
 												false,
 												String::utf8(
-														message UTF8String));
+														[message UTF8String]);
 							}
 						});
 			}];
