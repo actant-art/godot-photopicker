@@ -346,6 +346,31 @@ jobs:
 
 
       # ==========================================================
+      # 9.1 VERIFICAR IOS DEPLOYMENT TARGET DO GODOT
+      # ==========================================================
+
+      - name: Inspect Godot iOS deployment target
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins/godot
+
+          echo "======================================"
+          echo "SEARCH ios_deployment_target"
+          echo "======================================"
+
+          grep -R \
+            -n \
+            "ios_deployment_target" \
+            SConstruct \
+            platform \
+            methods.py \
+            2>/dev/null \
+            || true
+
+
+
+      # ==========================================================
       # 10. COMPILAR HEADERS DO GODOT PARA IOS
       # ==========================================================
 
