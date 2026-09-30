@@ -214,43 +214,6 @@ jobs:
             -type f \
             -print
 
-      - name: Inspect PhotoPicker directory
-        shell: bash
-        run: |
-
-          echo "======================================"
-          echo "PHOTO PICKER DIRECTORY"
-          echo "======================================"
-
-          find godot-ios-plugins/plugins/photo_picker \
-            -maxdepth 1 \
-            -type f \
-            -print
-
-          echo ""
-          echo "======================================"
-          echo "ALL SOURCE FILES"
-          echo "======================================"
-
-          find godot-ios-plugins/plugins/photo_picker \
-            -maxdepth 1 \
-            -type f \
-            \( -name "*.cpp" -o -name "*.mm" -o -name "*.m" \) \
-            -print
-
-          echo ""
-          echo "======================================"
-          echo "SEARCH INIT/DEINIT"
-          echo "======================================"
-
-          grep -R \
-            -n \
-            -E \
-            'godot_photopicker_init|godot_photopicker_deinit' \
-            godot-ios-plugins/plugins/photo_picker \
-            || true
-            
-
       # ==========================================================
       # 8.1 INSPECIONAR PHOTOPICKER
       # ==========================================================
