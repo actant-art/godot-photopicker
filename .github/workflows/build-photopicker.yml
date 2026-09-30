@@ -401,6 +401,57 @@ jobs:
             -library "./bin/libphoto_picker-simulator.release.a" \
             -output "./bin/photo_picker.release.xcframework"
 
+      # ==========================================================
+      # 11.1 INSPECIONAR SÍMBOLOS DO PHOTOPICKER
+      # ==========================================================
+
+      - name: Inspect PhotoPicker symbols
+        shell: bash
+        run: |
+
+          cd godot-ios-plugins
+
+          echo "======================================"
+          echo "PHOTO PICKER RELEASE LIBRARY"
+          echo "======================================"
+
+          ls -lh \
+            bin/libphoto_picker.arm64-ios.release.a
+
+          echo ""
+          echo "======================================"
+          echo "SEARCH INIT / DEINIT WITH STRINGS"
+          echo "======================================"
+
+          strings \
+            bin/libphoto_picker.arm64-ios.release.a \
+            | grep -E \
+            'godot_photopicker_(init|deinit)' \
+            || true
+
+          echo ""
+          echo "======================================"
+          echo "SEARCH PHOTOPICKER SYMBOLS"
+          echo "======================================"
+
+          strings \
+            bin/libphoto_picker.arm64-ios.release.a \
+            | grep -E \
+            'PhotoPicker|photopicker' \
+            | head -100 \
+            || true
+
+          echo ""
+          echo "======================================"
+          echo "NM INIT / DEINIT"
+          echo "======================================"
+
+          nm -gU \
+            bin/libphoto_picker.arm64-ios.release.a \
+            | grep -E \
+            'godot_photopicker_(init|deinit)' \
+            || true
+
 
       # ==========================================================
       # 12. GERAR XCFRAMEWORK DEBUG
