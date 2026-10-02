@@ -295,16 +295,19 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 	}
 
 	/*
-	 * UIGraphics rendering normalizes the UIImage orientation.
+	 * Renderiza o UIImage em um CGContext.
 	 *
-	 * This is important because photos from the iOS library
-	 * can contain EXIF orientation metadata instead of being
-	 * physically stored in the displayed orientation.
+	 * O drawInRect: respeita a orientação do UIImage,
+	 * incluindo a orientação proveniente de fotos HEIC/EXIF.
+	 *
+	 * NÃO fazemos CGContextTranslateCTM/ScaleCTM manualmente.
+	 * O contexto UIKit já fornece o sistema de coordenadas
+	 * apropriado.
 	 */
 	UIGraphicsBeginImageContextWithOptions(
 			image.size,
 			YES,
-			image.scale);
+			1.0);
 
 	CGContextRef context =
 			UIGraphicsGetCurrentContext();
@@ -313,20 +316,6 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 		UIGraphicsEndImageContext();
 		return Ref<Image>();
 	}
-
-	/*
-	 * Flip the Core Graphics coordinate system so that
-	 * UIImage is rendered with the expected orientation.
-	 */
-	CGContextTranslateCTM(
-			context,
-			0,
-			image.size.height);
-
-	CGContextScaleCTM(
-			context,
-			1.0,
-			-1.0);
 
 	[image drawInRect:CGRectMake(
 			0,
@@ -337,9 +326,8 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 	CGImageRef cgImage =
 			CGBitmapContextCreateImage(context);
 
-	UIGraphicsEndImageContext();
-
 	if (!cgImage) {
+		UIGraphicsEndImageContext();
 		return Ref<Image>();
 	}
 
@@ -349,21 +337,18 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 	size_t height =
 			CGImageGetHeight(cgImage);
 
+	size_t bytesPerPixel = 4;
+	size_t bytesPerRow = width * bytesPerPixel;
+	size_t bitsPerComponent = 8;
+
 	CGColorSpaceRef colorSpace =
 			CGColorSpaceCreateDeviceRGB();
 
 	if (!colorSpace) {
 		CGImageRelease(cgImage);
+		UIGraphicsEndImageContext();
 		return Ref<Image>();
 	}
-
-	size_t bytesPerPixel = 4;
-	size_t bytesPerRow = width * bytesPerPixel;
-	size_t bitsPerComponent = 8;
-
-	CGBitmapInfo bitmapInfo =
-			kCGImageAlphaPremultipliedLast |
-			kCGBitmapByteOrderDefault;
 
 	CFMutableDataRef data =
 			CFDataCreateMutable(
@@ -373,15 +358,13 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 	if (!data) {
 		CGColorSpaceRelease(colorSpace);
 		CGImageRelease(cgImage);
+		UIGraphicsEndImageContext();
 		return Ref<Image>();
 	}
 
 	CFDataSetLength(
 			data,
 			width * height * bytesPerPixel);
-
-	CGDataProviderRef provider =
-			CGDataProviderCreateWithCFData(data);
 
 	CGContextRef bitmapContext =
 			CGBitmapContextCreate(
@@ -391,23 +374,42 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 					bitsPerComponent,
 					bytesPerRow,
 					colorSpace,
-					bitmapInfo);
+					kCGImageAlphaPremultipliedLast |
+							kCGBitmapByteOrderDefault);
 
 	if (!bitmapContext) {
-		CGDataProviderRelease(provider);
 		CFRelease(data);
 		CGColorSpaceRelease(colorSpace);
 		CGImageRelease(cgImage);
+		UIGraphicsEndImageContext();
 		return Ref<Image>();
 	}
+
+	/*
+	 * O CGImage possui origem inferior-esquerda,
+	 * enquanto o bitmap que entregaremos ao Godot
+	 * deve manter a orientação visual normalizada.
+	 *
+	 * Invertemos somente o sistema de coordenadas do
+	 * CGContext usado para copiar o CGImage.
+	 */
+	CGContextTranslateCTM(
+			bitmapContext,
+			0,
+			static_cast<CGFloat>(height));
+
+	CGContextScaleCTM(
+			bitmapContext,
+			1.0,
+			-1.0);
 
 	CGContextDrawImage(
 			bitmapContext,
 			CGRectMake(
 					0,
 					0,
-					width,
-					height),
+					static_cast<CGFloat>(width),
+					static_cast<CGFloat>(height)),
 			cgImage);
 
 	CGImageRef rgbaImage =
@@ -431,11 +433,8 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 			Vector<uint8_t> img_data;
 			img_data.resize(length);
 
-			uint8_t *write_ptr =
-					img_data.ptrw();
-
 			memcpy(
-					write_ptr,
+					img_data.ptrw(),
 					CFDataGetBytePtr(rgbaData),
 					length);
 
@@ -455,10 +454,11 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 	}
 
 	CGContextRelease(bitmapContext);
-	CGDataProviderRelease(provider);
 	CFRelease(data);
 	CGColorSpaceRelease(colorSpace);
 	CGImageRelease(cgImage);
+
+	UIGraphicsEndImageContext();
 
 	return result;
 }
