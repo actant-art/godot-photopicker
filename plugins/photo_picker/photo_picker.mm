@@ -30,8 +30,6 @@
 
 #include "photo_picker.h"
 
-#include "core/class_db.h"
-
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <Photos/Photos.h>
