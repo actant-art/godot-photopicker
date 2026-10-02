@@ -84,6 +84,15 @@ public:
 			const String &filename);
 
 	/*
+	 * Exporta frames PNG para um arquivo MP4 usando
+	 * AVFoundation e H.264.
+	 */
+	bool export_frames(
+			const String &frames_directory,
+			const String &output_path,
+			int fps);
+
+	/*
 	 * Emite o resultado da operação de salvamento da imagem.
 	 *
 	 * success = true  -> imagem salva com sucesso
