@@ -317,7 +317,48 @@ jobs:
           echo "OK: Photos.framework"
           echo "OK: PhotosUI.framework"
 
+          grep -q 'AVFoundation.framework' \
+            plugins/photo_picker/photo_picker.gdip \
+            || {
+              echo "ERROR: AVFoundation.framework not declared."
+              exit 1
+            }
+          
+          grep -q 'CoreGraphics.framework' \
+            plugins/photo_picker/photo_picker.gdip \
+            || {
+              echo "ERROR: CoreGraphics.framework not declared."
+              exit 1
+            }
+          
+          grep -q 'CoreMedia.framework' \
+            plugins/photo_picker/photo_picker.gdip \
+            || {
+              echo "ERROR: CoreMedia.framework not declared."
+              exit 1
+            }
+          
+          grep -q 'CoreVideo.framework' \
+            plugins/photo_picker/photo_picker.gdip \
+            || {
+              echo "ERROR: CoreVideo.framework not declared."
+              exit 1
+            }
+          
+          grep -q 'UIKit.framework' \
+            plugins/photo_picker/photo_picker.gdip \
+            || {
+              echo "ERROR: UIKit.framework not declared."
+              exit 1
+            }
 
+          echo "OK: AVFoundation.framework"
+          echo "OK: CoreGraphics.framework"
+          echo "OK: CoreMedia.framework"
+          echo "OK: CoreVideo.framework"
+          echo "OK: UIKit.framework"
+
+            
           echo ""
           echo "======================================"
           echo "VERIFY PHOTO LIBRARY PERMISSION"
@@ -415,6 +456,24 @@ jobs:
           echo "OK: Photo save API detected."
 
 
+          echo ""
+          echo "======================================"
+          echo "VERIFY VIDEO EXPORT API"
+          echo "======================================"
+          
+          if ! grep -q 'export_frames' \
+            plugins/photo_picker/photo_picker.h \
+            && ! grep -q 'export_frames' \
+            plugins/photo_picker/photo_picker.mm
+          then
+            echo "ERROR: export_frames API not found."
+            exit 1
+          fi
+          
+          echo "OK: export_frames API detected."
+
+          echo "OK: Video export API"
+          
           echo ""
           echo "======================================"
           echo "PHOTO PICKER HEADER"
@@ -515,6 +574,24 @@ jobs:
           fi
 
           echo "OK: PhotoPicker deployment target is iOS 15.0."
+
+          echo ""
+          echo "======================================"
+          echo "VERIFY VIDEO EXPORT API"
+          echo "======================================"
+          
+          for symbol in \
+            'export_frames'
+          do
+            if ! grep -q "$symbol" plugins/photo_picker/photo_picker.h \
+               && ! grep -q "$symbol" plugins/photo_picker/photo_picker.mm
+            then
+              echo "ERROR: Video export API symbol not found: $symbol"
+              exit 1
+            fi
+          done
+          
+          echo "OK: Video export API detected."
 
 
       # ==========================================================
@@ -980,7 +1057,17 @@ jobs:
           Frameworks:
           Photos.framework
           PhotosUI.framework
+          AVFoundation.framework
+          CoreGraphics.framework
+          CoreMedia.framework
+          CoreVideo.framework
+          UIKit.framework
 
+          Video Export:
+          AVAssetWriter
+          H.264
+          PNG frames -> MP4
+          
           Godot:
           4.6.3-stable
 
