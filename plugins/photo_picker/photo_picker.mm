@@ -998,6 +998,13 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 		size_t width,
 		size_t height) {
 
+	if (image == nullptr ||
+			width == 0 ||
+			height == 0) {
+
+		return nullptr;
+	}
+
 	CVPixelBufferRef pixel_buffer = nullptr;
 
 	NSDictionary *attributes = @{
@@ -1021,9 +1028,17 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 		return nullptr;
 	}
 
-	CVPixelBufferLockBaseAddress(
-			pixel_buffer,
-			0);
+	CVReturn lock_result =
+			CVPixelBufferLockBaseAddress(
+					pixel_buffer,
+					0);
+
+	if (lock_result != kCVReturnSuccess) {
+
+		CVPixelBufferRelease(pixel_buffer);
+
+		return nullptr;
+	}
 
 	void *base_address =
 			CVPixelBufferGetBaseAddress(
@@ -1033,8 +1048,31 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 			CVPixelBufferGetBytesPerRow(
 					pixel_buffer);
 
+	/*
+	 * Inicializa explicitamente todo o buffer.
+	 *
+	 * Isso evita que qualquer região não escrita pelo
+	 * CGContext contenha lixo de memória que possa
+	 * aparecer como artefatos no primeiro frame.
+	 */
+	memset(
+			base_address,
+			0,
+			bytes_per_row * height);
+
 	CGColorSpaceRef color_space =
 			CGColorSpaceCreateDeviceRGB();
+
+	if (color_space == nullptr) {
+
+		CVPixelBufferUnlockBaseAddress(
+				pixel_buffer,
+				0);
+
+		CVPixelBufferRelease(pixel_buffer);
+
+		return nullptr;
+	}
 
 	CGContextRef context =
 			CGBitmapContextCreate(
@@ -1045,7 +1083,7 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 					bytes_per_row,
 					color_space,
 					kCGBitmapByteOrder32Little |
-							kCGImageAlphaPremultipliedFirst);
+							kCGImageAlphaNoneSkipFirst);
 
 	if (context == nullptr) {
 
@@ -1056,26 +1094,17 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 				pixel_buffer,
 				0);
 
-		CFRelease(pixel_buffer);
+		CVPixelBufferRelease(pixel_buffer);
 
 		return nullptr;
 	}
 
 	/*
-	 * Corrige a orientação vertical do CoreGraphics.
-	
-				CGContextTranslateCTM(
-						context,
-						0,
-						static_cast<CGFloat>(
-								height));
-			
-				CGContextScaleCTM(
-						context,
-						1.0,
-						-1.0);
+	 * NÃO aplicar TranslateCTM / ScaleCTM aqui.
+	 *
+	 * A orientação já está correta nos PNGs produzidos
+	 * pelo Fluxus.
 	 */
-	
 	CGContextDrawImage(
 			context,
 			CGRectMake(
@@ -1086,6 +1115,8 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 					static_cast<CGFloat>(
 							height)),
 			image);
+
+	CGContextFlush(context);
 
 	CGContextRelease(context);
 
