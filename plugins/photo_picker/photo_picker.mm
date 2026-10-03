@@ -441,21 +441,6 @@ static const NSInteger MAX_SELECTION_LIMIT = 12;
 		return Ref<Image>();
 	}
 
-	/*
-	 * O CGImage possui origem inferior-esquerda,
-	 * enquanto o bitmap entregue ao Godot deve
-	 * manter a orientação visual normalizada.
-	 */
-	CGContextTranslateCTM(
-			bitmapContext,
-			0,
-			static_cast<CGFloat>(height));
-
-	CGContextScaleCTM(
-			bitmapContext,
-			1.0,
-			-1.0);
-
 	CGContextDrawImage(
 			bitmapContext,
 			CGRectMake(
