@@ -1063,18 +1063,19 @@ static CVPixelBufferRef create_pixel_buffer_from_image(
 
 	/*
 	 * Corrige a orientação vertical do CoreGraphics.
+	
+				CGContextTranslateCTM(
+						context,
+						0,
+						static_cast<CGFloat>(
+								height));
+			
+				CGContextScaleCTM(
+						context,
+						1.0,
+						-1.0);
 	 */
-	CGContextTranslateCTM(
-			context,
-			0,
-			static_cast<CGFloat>(
-					height));
-
-	CGContextScaleCTM(
-			context,
-			1.0,
-			-1.0);
-
+	
 	CGContextDrawImage(
 			context,
 			CGRectMake(
